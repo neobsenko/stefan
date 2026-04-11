@@ -1,0 +1,20 @@
+Stefan — återställ till version 1 (v1)
+
+En git-tagg "v1" pekar på kodbasen som den var när checkpointen skapades
+(innan senaste UI-förbättringar). Allt som committats efter den första v1-commiten
+kan du kasta och gå tillbaka så här:
+
+  cd c:\reductlegal
+  git reset --hard v1
+
+Varning: Alla osparade ändringar i spårade filer försvinner. Spara eller kopiera
+det du behöver först.
+
+Kolla att taggen finns:
+
+  git tag -l
+  git show v1 --oneline -s
+
+Om du bara vill se skillnad mot v1:
+
+  git diff v1

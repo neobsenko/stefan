@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="sv">
 <head>
   <meta charset="utf-8">
-  <title>stefan</title>
+  <title>Stefan — dölj känslig text</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
@@ -20,6 +20,10 @@
       --c-other:    rgba(156, 163, 175, 0.2);
       --window: #1a1a1a;
       --window-edge: #333;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #editor span.ent { transition: none; }
+      .primary { transition: none; }
     }
     * { box-sizing: border-box; }
     html, body {
@@ -57,13 +61,50 @@
       overflow: hidden;
     }
     .brand {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      text-transform: lowercase;
-      margin-bottom: 0.5rem;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.06em;
+      text-transform: none;
+      margin-bottom: 0.35rem;
       flex-shrink: 0;
+    }
+    .tagline {
+      font-size: 15px;
+      line-height: 1.45;
+      color: #b8b8b8;
+      margin: 0 0 0.85rem;
+      max-width: 42em;
+      flex-shrink: 0;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      margin-bottom: 0.65rem;
+      flex-shrink: 0;
+    }
+    .toolbar-btn {
+      min-height: 44px;
+      padding: 0 1rem;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--text);
+      background: #2c2c2c;
+      border: 1px solid #444;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .toolbar-btn:hover { background: #353535; border-color: #555; }
+    .toolbar-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .toolbar-hint {
+      font-size: 13px;
+      color: var(--muted);
     }
     #editor {
       flex: 1 1 0;
@@ -85,10 +126,13 @@
       outline: none;
       tab-size: 4;
     }
+    #editor:focus-visible {
+      box-shadow: 0 0 0 2px rgba(42, 109, 244, 0.45);
+    }
     /* Placeholder when empty (ZWSP in DOM so caret can exist). */
     #editor.editor-placeholder:not(:focus)::before {
-      content: "Paste your text here";
-      color: #444;
+      content: "Klistra in e-post eller text här — eller Ctrl+V";
+      color: #555;
       pointer-events: none;
     }
     #editor span.ent {
@@ -111,8 +155,9 @@
     .bottom { margin-top: 1.1rem; }
     .primary {
       width: 100%;
-      padding: 0.85rem 1rem;
-      font-size: 15px;
+      min-height: 48px;
+      padding: 0.9rem 1rem;
+      font-size: 17px;
       font-weight: 600;
       border: none;
       border-radius: 10px;
@@ -124,6 +169,10 @@
       cursor: pointer;
     }
     .primary.primary--action:hover:not(:disabled) { background: var(--accent-hover); }
+    .primary:focus-visible {
+      outline: 2px solid #7eb0ff;
+      outline-offset: 2px;
+    }
     .primary.primary--busy {
       background: #2a3f6e;
       color: #c8d8ff;
@@ -148,8 +197,8 @@
     }
     .status {
       margin-top: 0.55rem;
-      font-size: 12px;
-      color: var(--muted);
+      font-size: 14px;
+      color: #a0a0a0;
       min-height: 1.25em;
       text-align: left;
     }
@@ -203,8 +252,9 @@
       background: transparent;
       border: none;
       color: var(--text);
-      padding: 6px 10px;
-      font-size: 12px;
+      padding: 8px 12px;
+      font-size: 13px;
+      min-height: 40px;
       border-radius: 5px;
       cursor: pointer;
       font-family: inherit;
@@ -219,13 +269,18 @@
 </head>
 <body>
   <div class="app">
-    <div class="brand">stefan</div>
-    <div id="editor" contenteditable="true" spellcheck="false"></div>
+    <div class="brand">Stefan</div>
+    <p class="tagline">Döljer namn, nummer och känsliga uppgifter innan du klistrar in i AI. Körs lokalt i din webbläsare.</p>
+    <div class="toolbar">
+      <button type="button" class="toolbar-btn" id="pasteFromClipboard">Klistra in text</button>
+      <span class="toolbar-hint">eller tryck Ctrl+V i rutan nedan</span>
+    </div>
+    <div id="editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Text att anonymisera"></div>
     <div class="bottom">
       <button type="button" id="primary" class="primary hidden" aria-hidden="true"></button>
       <div id="status" class="status"></div>
     </div>
-    <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Clear</a>
+    <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Börja om</a>
   </div>
   <div id="popup" class="popup hidden"></div>
 
@@ -246,6 +301,7 @@ const primary = document.getElementById("primary");
 const statusEl = document.getElementById("status");
 const popup   = document.getElementById("popup");
 const clearLink = document.getElementById("clear");
+const pasteFromClipboard = document.getElementById("pasteFromClipboard");
 
 let state = {
   mode: null,            // 'redact' | 'hydrate' | null
@@ -472,10 +528,10 @@ function updateStatus() {
     primary.classList.remove("hidden");
     primary.setAttribute("aria-hidden", "false");
     primary.className = "primary primary--success";
-    primary.textContent = "Copy final result ✓";
+    primary.textContent = "Kopiera återställd text ✓";
     primary.disabled = false;
     const r = state.hydrateRestored;
-    statusEl.textContent = `${r} item${r === 1 ? "" : "s"} restored`;
+    statusEl.textContent = r === 1 ? "1 del återställd" : `${r} delar återställda`;
     return;
   }
 
@@ -488,24 +544,24 @@ function updateStatus() {
 
     if (state.awaitingReturnPaste) {
       primary.className = "primary primary--wait";
-      primary.textContent = "Paste AI response here to restore ↓";
+      primary.textContent = "Klistra in AI-svar här för att återställa ↓";
       primary.disabled = true;
-      statusEl.textContent = "Copied. Waiting for AI response…";
+      statusEl.textContent = "Kopierat. Väntar på svar från AI …";
       return;
     }
 
     if (busy) {
       primary.className = "primary primary--busy";
-      primary.textContent = "Working…";
+      primary.textContent = "Jobbar …";
       primary.disabled = true;
-      statusEl.textContent = "Detecting…";
+      statusEl.textContent = "Letar efter känslig text …";
       return;
     }
 
     primary.className = "primary primary--action";
-    primary.textContent = "Copy & open ChatGPT →";
+    primary.textContent = "Kopiera och öppna ChatGPT →";
     primary.disabled = false;
-    statusEl.textContent = `${n} item${n === 1 ? "" : "s"} redacted`;
+    statusEl.textContent = n === 1 ? "1 känslig del dold" : `${n} känsliga delar dolda`;
     return;
   }
 
@@ -541,9 +597,8 @@ async function runDetection(text) {
   } catch (e) {
     if (e && e.name === "AbortError") {
       throw new Error(
-        "Detection timed out after 2 min. Try: shorter text, "
-        + "restart the server and wait for “NER model ready”, "
-        + "or run: stefan serve --no-spacy"
+        "Tidsgräns efter 2 min. Prova kortare text, starta om servern "
+        + "och vänta på \"NER model ready\", eller kör: stefan serve --no-spacy"
       );
     }
     throw e;
@@ -593,9 +648,9 @@ async function runRedactDetectionForEpoch(epoch) {
     renderEditor();
   } catch (e) {
     if (epoch !== editEpoch) return;
-    statusEl.textContent = "Detection failed: " + (e.message || e);
+    statusEl.textContent = "Kunde inte analysera: " + (e.message || e);
     primary.className = "primary primary--action";
-    primary.textContent = "Copy & open ChatGPT →";
+    primary.textContent = "Kopiera och öppna ChatGPT →";
   } finally {
     redactDetectInFlight = false;
     updateStatus();
@@ -640,6 +695,31 @@ function onPaste(e) {
 
 // Catch paste anywhere on the page so the user never needs to focus the editor
 window.addEventListener("paste", onPaste);
+
+pasteFromClipboard.addEventListener("click", async () => {
+  if (!navigator.clipboard || !navigator.clipboard.readText) {
+    statusEl.textContent = "Webbläsaren tillåter inte knappen här — använd Ctrl+V i rutan.";
+    editor.focus();
+    return;
+  }
+  try {
+    const raw = await navigator.clipboard.readText();
+    if (!raw || !String(raw).trim()) {
+      statusEl.textContent = "Urklippet är tomt.";
+      return;
+    }
+    const text = normalizePastedText(raw);
+    const forHydrate = stripHydrationWrappers(text);
+    if (hasUsablePlaceholders(forHydrate)) {
+      handleHydratePaste(forHydrate);
+    } else {
+      handleRedactPaste(text);
+    }
+    editor.focus();
+  } catch (e) {
+    statusEl.textContent = "Kunde inte läsa urklipp — prova Ctrl+V.";
+  }
+});
 
 // Typing and local edits (contenteditable)
 editor.addEventListener("input", () => {
@@ -689,10 +769,10 @@ editor.addEventListener("input", () => {
 
 const TAG_BUTTONS = [
   { label: "Person",   target: "PERSON" },
-  { label: "Company",  target: "ORG" },
-  { label: "Location", target: "LOCATION" },
-  { label: "Contact",  target: "CONTACT" },
-  { label: "Other",    target: "ITEM" },
+  { label: "Företag",  target: "ORG" },
+  { label: "Plats",    target: "LOCATION" },
+  { label: "Kontakt",  target: "CONTACT" },
+  { label: "Övrigt",   target: "ITEM" },
 ];
 
 function buildPopup() {
@@ -711,15 +791,15 @@ function buildPopup() {
   }
   const divider = document.createElement("div");
   divider.className = "popup-divider";
-  divider.textContent = "Add to database";
+  divider.textContent = "Spara i ordlista";
 
   const rowDb = document.createElement("div");
   rowDb.className = "popup-row";
   const btnName = document.createElement("button");
   btnName.type = "button";
   btnName.className = "popup-add-db";
-  btnName.textContent = "Save as name";
-  btnName.title = "Append to data/custom_names.txt (local)";
+  btnName.textContent = "Spara som namn";
+  btnName.title = "Läggs till i data/custom_names.txt (på den här datorn)";
   btnName.addEventListener("mousedown", (e) => {
     e.preventDefault();
     addSelectionToDictionary("name");
@@ -727,8 +807,8 @@ function buildPopup() {
   const btnOrg = document.createElement("button");
   btnOrg.type = "button";
   btnOrg.className = "popup-add-db";
-  btnOrg.textContent = "Save as company";
-  btnOrg.title = "Append to data/construction_orgs.txt (local)";
+  btnOrg.textContent = "Spara som företag";
+  btnOrg.title = "Läggs till i data/construction_orgs.txt (på den här datorn)";
   btnOrg.addEventListener("mousedown", (e) => {
     e.preventDefault();
     addSelectionToDictionary("org");
@@ -770,13 +850,13 @@ async function addSelectionToDictionary(kind) {
       data = await res.json();
     } catch (_) { /* ignore */ }
     if (!res.ok) {
-      statusEl.textContent = "Could not save: " + (data.error || res.statusText);
+      statusEl.textContent = "Kunde inte spara: " + (data.error || res.statusText);
       return;
     }
     if (data.duplicate) {
-      statusEl.textContent = "Already in " + (data.file || "dictionary") + ".";
+      statusEl.textContent = "Finns redan i " + (data.file || "listan") + ".";
     } else {
-      statusEl.textContent = "Saved to " + (data.file || "dictionary") + ". Re-detecting…";
+      statusEl.textContent = "Sparat i " + (data.file || "listan") + ". Letar igen …";
     }
     if (state.mode === "redact" && state.text) {
       editEpoch++;
@@ -784,7 +864,7 @@ async function addSelectionToDictionary(kind) {
       runRedactDetectionForEpoch(epoch);
     }
   } catch (err) {
-    statusEl.textContent = "Save failed: " + (err.message || String(err));
+    statusEl.textContent = "Kunde inte spara: " + (err.message || String(err));
   }
 }
 
@@ -932,7 +1012,7 @@ primary.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(wrapRedactedForClipboard(redacted));
     } catch (e) {
-      statusEl.textContent = "Clipboard blocked: " + e.message;
+      statusEl.textContent = "Urklipp blockerat: " + e.message;
       return;
     }
     saveMapping({ ...loadMapping(), ...mapping });
@@ -945,10 +1025,10 @@ primary.addEventListener("click", async () => {
   } else if (state.mode === "hydrate") {
     try {
       await navigator.clipboard.writeText(state.text);
-      statusEl.textContent = "Copied!";
+      statusEl.textContent = "Kopierat!";
       setTimeout(() => updateStatus(), 1300);
     } catch (e) {
-      statusEl.textContent = "Clipboard blocked: " + e.message;
+      statusEl.textContent = "Urklipp blockerat: " + e.message;
     }
   }
 });
