@@ -1,0 +1,40 @@
+ABB
+IKEA
+SEB
+SAS
+SKF
+ICA
+NCC
+SCA
+SSAB
+LKAB
+MTG
+EQT
+H&M
+KF
+OK
+ATG
+SJ
+SVT
+SR
+TV4
+PostNord
+Telia
+Tele2
+Klarna
+Spotify
+Ericsson
+Volvo
+Saab
+Scania
+Electrolux
+Husqvarna
+Atlas Copco
+Sandvik
+Alfa Laval
+Securitas
+Assa Abloy
+Hexagon
+Investor
+Kinnevik
+Industrivärden

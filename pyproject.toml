@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reduct"
+version = "0.1.0"
+description = "A CLI tool for reversible text redaction with regex, dictionary, and spaCy NER detection."
+requires-python = ">=3.9"
+dependencies = [
+    "click",
+    "spacy",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+web = ["flask"]
+
+[project.scripts]
+stefan = "reduct.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["reduct*"]
+
+[tool.setuptools.package-data]
+reduct = ["data/*.txt", "static/*.html"]

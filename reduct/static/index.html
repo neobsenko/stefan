@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>stefan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #161616;
+      --text: #e8e8e8;
+      --muted: #888;
+      --accent: #2a6df4;
+      --accent-hover: #4080ff;
+      --c-person:   rgba(96, 165, 250, 0.2);
+      --c-org:      rgba(168, 85, 247, 0.2);
+      --c-location: rgba(74, 222, 128, 0.2);
+      --c-contact:  rgba(251, 191, 36, 0.2);
+      --c-secret:   rgba(248, 113, 113, 0.2);
+      --c-other:    rgba(156, 163, 175, 0.2);
+      --window: #1a1a1a;
+      --window-edge: #333;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: clamp(1rem, 4vw, 2.5rem);
+    }
+    .app {
+      position: relative;
+      width: min(100%, 58rem);
+      max-width: 100%;
+      min-height: min(76vh, 42rem);
+      max-height: min(90vh, 52rem);
+      margin: 0 auto;
+      padding: 1.15rem 1.5rem 2.35rem;
+      background: var(--window);
+      border: 1px solid var(--window-edge);
+      border-radius: 16px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 20px 50px rgba(0,0,0,0.5),
+        0 4px 16px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .brand {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: lowercase;
+      margin-bottom: 0.5rem;
+      flex-shrink: 0;
+    }
+    #editor {
+      flex: 1 1 0;
+      min-height: 10rem;
+      min-width: 0;
+      font-size: 19px;
+      line-height: 1.65;
+      padding: 1rem 0.75rem 1.25rem;
+      margin: 0 -0.25rem;
+      background: rgba(0,0,0,0.18);
+      border: none;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      overflow-y: auto;
+      user-select: text;
+      cursor: text;
+      outline: none;
+      tab-size: 4;
+    }
+    /* Placeholder when empty (ZWSP in DOM so caret can exist). */
+    #editor.editor-placeholder:not(:focus)::before {
+      content: "Paste your text here";
+      color: #444;
+      pointer-events: none;
+    }
+    #editor span.ent {
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+      transition: filter 0.12s ease;
+    }
+    #editor span.ent:hover { filter: brightness(1.12); }
+    #editor span.ent.PERSON   { background: var(--c-person); }
+    #editor span.ent.ORG,
+    #editor span.ent.ORG_NR   { background: var(--c-org); }
+    #editor span.ent.LOCATION { background: var(--c-location); }
+    #editor span.ent.EMAIL    { background: var(--c-contact); }
+    #editor span.ent.PHONE    { background: var(--c-contact); }
+    #editor span.ent.URL      { background: var(--c-contact); }
+    #editor span.ent.SSN      { background: var(--c-secret); }
+    #editor span.ent.IP       { background: var(--c-secret); }
+    #editor span.ent.ITEM     { background: var(--c-other); }
+    .bottom { margin-top: 1.1rem; }
+    .primary {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    }
+    .primary.primary--action {
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    .primary.primary--action:hover:not(:disabled) { background: var(--accent-hover); }
+    .primary.primary--busy {
+      background: #2a3f6e;
+      color: #c8d8ff;
+      cursor: wait;
+    }
+    .primary.primary--wait {
+      background: transparent;
+      color: var(--muted);
+      font-weight: 500;
+      cursor: default;
+      pointer-events: none;
+    }
+    .primary.primary--success {
+      background: #1d6b45;
+      color: #e8fff0;
+      cursor: pointer;
+    }
+    .primary.primary--success:hover:not(:disabled) { background: #248f5a; }
+    .primary:disabled {
+      opacity: 0.85;
+      cursor: default;
+    }
+    .status {
+      margin-top: 0.55rem;
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 1.25em;
+      text-align: left;
+    }
+    .clear {
+      position: absolute;
+      bottom: 0.65rem;
+      right: 1rem;
+      font-size: 12px;
+      color: #666;
+      text-decoration: none;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+    .clear:hover:not(.clear--inactive) { color: var(--text); }
+    .clear.clear--inactive {
+      color: #3a3a3a;
+      cursor: default;
+      pointer-events: none;
+    }
+    .popup {
+      position: fixed;
+      background: #252525;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 8px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      min-width: min(100vw - 16px, 22rem);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+      z-index: 100;
+    }
+    .popup-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      justify-content: flex-start;
+    }
+    .popup-divider {
+      font-size: 10px;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 2px 0;
+      margin-top: 2px;
+      border-top: 1px solid #3a3a3a;
+    }
+    .popup button {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .popup button:hover { background: rgba(255,255,255,0.09); }
+    .popup button.popup-add-db {
+      color: #9ecbff;
+    }
+    .popup button.popup-add-db:hover { background: rgba(42, 109, 244, 0.2); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand">stefan</div>
+    <div id="editor" contenteditable="true" spellcheck="false"></div>
+    <div class="bottom">
+      <button type="button" id="primary" class="primary hidden" aria-hidden="true"></button>
+      <div id="status" class="status"></div>
+    </div>
+    <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Clear</a>
+  </div>
+  <div id="popup" class="popup hidden"></div>
+
+<script>
+"use strict";
+
+/** Paste → hydrate only if core placeholders appear (spec) and a mapping exists. */
+const HYDRATE_DETECT_RE = /\b(PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP)_\d+\b/;
+/** Replace including ITEM_* when hydrating (manual tags / older exports). */
+const HYDRATE_REPLACE_RE = /\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|ITEM)_\d+\b/g;
+const STORAGE_KEY = "stefan_mapping";
+const CHATGPT_URL = "https://chatgpt.com/";
+/** Invisible anchor so the caret can sit after the last <span> highlight (browser quirk). */
+const EDIT_CARET_ZWSP = "\u200B";
+
+const editor  = document.getElementById("editor");
+const primary = document.getElementById("primary");
+const statusEl = document.getElementById("status");
+const popup   = document.getElementById("popup");
+const clearLink = document.getElementById("clear");
+
+let state = {
+  mode: null,            // 'redact' | 'hydrate' | null
+  text: "",              // currently displayed text
+  spans: [],             // [{start,end,type,value}]
+  hydrateRestored: 0,
+  hydrateMissing: 0,
+  /** After Copy & open ChatGPT: editor shows redacted placeholders until next paste or edit. */
+  awaitingReturnPaste: false,
+};
+
+let pendingSelection = null;
+/** Ignore synthetic DOM updates from our own render/splice. */
+let editorSyncing = false;
+let detectTimer = null;
+/** Bumps on each edit/paste so stale detection responses are ignored. */
+let editEpoch = 0;
+let redactDetectInFlight = false;
+/** While detectTimer runs: 'paste' shows Detecting immediately; 'type' keeps status until fetch. */
+let pendingRedactSource = null;
+
+// ----- text helpers ------------------------------------------------------
+
+function normalizeText(t) {
+  return t
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")    // zero-width chars
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map(line => line.replace(/[ \t]+$/, ""))  // trailing whitespace
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");               // collapse blank runs
+}
+
+/** Paste pipeline: base normalize + tweaks so ChatGPT/Word don’t break placeholder tokens. */
+function normalizePastedText(t) {
+  let s = normalizeText(t);
+  s = s.replace(/[\u2018\u2019\u201C\u201D\u00B4]/g, "'");
+  s = s.replace(
+    /`(\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP)_\d+)\b`/g,
+    "$1"
+  );
+  return s;
+}
+
+function sniffContactType(s) {
+  if (s.includes("@")) return "EMAIL";
+  if (/https?:\/\//i.test(s) || /\bwww\./i.test(s)) return "URL";
+  return "PHONE";
+}
+
+function escapeHTML(s) {
+  return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+}
+
+/** Plain text in document order (works with contenteditable + spans). */
+function extractPlainTextFromEditor() {
+  let out = "";
+  const w = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+  let n;
+  while ((n = w.nextNode())) out += n.textContent;
+  return out.replace(/\u200B/g, "");
+}
+
+function getCaretPlainOffset() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)) return null;
+  const range = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(editor);
+  pre.setEnd(range.startContainer, range.startOffset);
+  return pre.toString().length;
+}
+
+function setCaretPlainOffset(offset) {
+  const sel = window.getSelection();
+  const max = offset;
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+  let remain = max;
+  let node;
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length;
+    if (remain <= len) {
+      const r = document.createRange();
+      r.setStart(node, Math.max(0, remain));
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      editor.focus();
+      return;
+    }
+    remain -= len;
+  }
+  const endR = document.createRange();
+  endR.selectNodeContents(editor);
+  endR.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(endR);
+  editor.focus();
+}
+
+function clearDetectTimer() {
+  if (detectTimer) {
+    clearTimeout(detectTimer);
+    detectTimer = null;
+  }
+  pendingRedactSource = null;
+}
+
+function loadMapping() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveMapping(m) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+}
+
+/** Prepended/appended only to clipboard for ChatGPT — not shown in the editor. */
+const CLIPBOARD_INSTRUCTION_OPEN =
+  "[The following text has been automatically redacted for privacy. Placeholders like PERSON_1, ORG_2, EMAIL_1, LOCATION_1, PHONE_1, SSN_1, URL_1 represent real names, companies, emails, addresses, phone numbers, personal IDs, and URLs. Treat each placeholder as a consistent entity — the same placeholder always refers to the same real value. Respond normally using the placeholders as-is; they will be automatically restored afterward. Do not ask what the placeholders mean.]";
+const CLIPBOARD_INSTRUCTION_CLOSE =
+  "[End of redacted text. Please respond keeping all placeholders exactly as written.]";
+
+function wrapRedactedForClipboard(redacted) {
+  return CLIPBOARD_INSTRUCTION_OPEN + "\n\n" + redacted + "\n\n" + CLIPBOARD_INSTRUCTION_CLOSE;
+}
+
+/** Strip echoed AI instruction blocks before hydrating (clipboard wrappers). */
+const HYDRATE_STRIP_LEAD = /^\s*\[[^\]]*(?:redacted|placeholder)[^\]]*\]\s*/i;
+const HYDRATE_STRIP_TAIL = /\s*\[[^\]]*End of redacted[^\]]*\]\s*$/i;
+
+function stripHydrationWrappers(raw) {
+  let t = raw;
+  for (let i = 0; i < 32; i++) {
+    const n = t.replace(HYDRATE_STRIP_LEAD, "");
+    if (n === t) break;
+    t = n;
+  }
+  for (let i = 0; i < 32; i++) {
+    const n = t.replace(HYDRATE_STRIP_TAIL, "");
+    if (n === t) break;
+    t = n;
+  }
+  return t.trim();
+}
+
+// Build placeholder-replaced text + mapping from current state.
+function buildRedacted() {
+  const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+  const counters = {};
+  const valueMap = new Map();
+  const mapping = {};
+  let out = "";
+  let cursor = 0;
+  for (const sp of sorted) {
+    out += state.text.slice(cursor, sp.start);
+    const key = sp.type + "\0" + sp.value;
+    let ph = valueMap.get(key);
+    if (!ph) {
+      counters[sp.type] = (counters[sp.type] || 0) + 1;
+      ph = sp.type + "_" + counters[sp.type];
+      valueMap.set(key, ph);
+      mapping[ph] = sp.value;
+    }
+    out += ph;
+    cursor = sp.end;
+  }
+  out += state.text.slice(cursor);
+  return { redacted: out, mapping };
+}
+
+// ----- rendering ---------------------------------------------------------
+
+function renderEditor() {
+  editorSyncing = true;
+  try {
+    if (!state.text) {
+      editor.textContent = EDIT_CARET_ZWSP;
+      editor.classList.add("editor-placeholder");
+      return;
+    }
+    editor.classList.remove("editor-placeholder");
+    if (state.mode === "hydrate") {
+      editor.textContent = state.text;
+      return;
+    }
+    const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+    let html = "";
+    let cursor = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const sp = sorted[i];
+      if (sp.start > cursor) html += escapeHTML(state.text.slice(cursor, sp.start));
+      html += `<span class="ent ${sp.type}" data-i="${i}">`
+            + escapeHTML(state.text.slice(sp.start, sp.end))
+            + `</span>`;
+      cursor = sp.end;
+    }
+    if (cursor < state.text.length) html += escapeHTML(state.text.slice(cursor));
+    editor.innerHTML = html + EDIT_CARET_ZWSP;
+  } finally {
+    editorSyncing = false;
+  }
+}
+
+function isEmptyState() {
+  return state.mode === null && !state.text;
+}
+
+function updateStatus() {
+  if (isEmptyState()) {
+    primary.className = "primary";
+    primary.classList.add("hidden");
+    primary.setAttribute("aria-hidden", "true");
+    statusEl.textContent = "";
+    clearLink.classList.add("clear--inactive");
+    clearLink.setAttribute("aria-disabled", "true");
+    return;
+  }
+
+  clearLink.classList.remove("clear--inactive");
+  clearLink.setAttribute("aria-disabled", "false");
+
+  if (state.mode === "hydrate") {
+    primary.classList.remove("hidden");
+    primary.setAttribute("aria-hidden", "false");
+    primary.className = "primary primary--success";
+    primary.textContent = "Copy final result ✓";
+    primary.disabled = false;
+    const r = state.hydrateRestored;
+    statusEl.textContent = `${r} item${r === 1 ? "" : "s"} restored`;
+    return;
+  }
+
+  if (state.mode === "redact") {
+    primary.classList.remove("hidden");
+    primary.setAttribute("aria-hidden", "false");
+    const n = state.spans.length;
+    const waiting = detectTimer !== null;
+    const busy = redactDetectInFlight || waiting;
+
+    if (state.awaitingReturnPaste) {
+      primary.className = "primary primary--wait";
+      primary.textContent = "Paste AI response here to restore ↓";
+      primary.disabled = true;
+      statusEl.textContent = "Copied. Waiting for AI response…";
+      return;
+    }
+
+    if (busy) {
+      primary.className = "primary primary--busy";
+      primary.textContent = "Working…";
+      primary.disabled = true;
+      statusEl.textContent = "Detecting…";
+      return;
+    }
+
+    primary.className = "primary primary--action";
+    primary.textContent = "Copy & open ChatGPT →";
+    primary.disabled = false;
+    statusEl.textContent = `${n} item${n === 1 ? "" : "s"} redacted`;
+    return;
+  }
+
+  primary.className = "primary";
+  primary.classList.add("hidden");
+  primary.setAttribute("aria-hidden", "true");
+  statusEl.textContent = "";
+}
+
+// ----- detection / paste -------------------------------------------------
+
+const DETECT_TIMEOUT_MS = 120_000;
+
+async function runDetection(text) {
+  const controller = new AbortController();
+  const kill = setTimeout(() => controller.abort(), DETECT_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let msg = await res.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j && j.error) msg = j.error;
+      } catch (_) { /* keep body */ }
+      throw new Error(msg);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error(
+        "Detection timed out after 2 min. Try: shorter text, "
+        + "restart the server and wait for “NER model ready”, "
+        + "or run: stefan serve --no-spacy"
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(kill);
+  }
+}
+
+function hasUsablePlaceholders(text) {
+  if (!HYDRATE_DETECT_RE.test(text)) return false;
+  const m = loadMapping();
+  return Object.keys(m).length > 0;
+}
+
+function handleHydratePaste(text) {
+  text = stripHydrationWrappers(text);
+  clearDetectTimer();
+  editEpoch++;
+  state.awaitingReturnPaste = false;
+  const mapping = loadMapping();
+  let restored = 0;
+  let missing = 0;
+  const seenMissing = new Set();
+  const result = text.replace(HYDRATE_REPLACE_RE, (ph) => {
+    if (mapping[ph] !== undefined) { restored++; return mapping[ph]; }
+    if (!seenMissing.has(ph)) { seenMissing.add(ph); missing++; }
+    return ph;
+  });
+  state.mode = "hydrate";
+  state.text = result;
+  state.spans = [];
+  state.hydrateRestored = restored;
+  state.hydrateMissing = missing;
+  renderEditor();
+  updateStatus();
+}
+
+async function runRedactDetectionForEpoch(epoch) {
+  redactDetectInFlight = true;
+  updateStatus();
+  try {
+    const data = await runDetection(state.text);
+    if (epoch !== editEpoch) return;
+    state.spans = (data.spans || []).map(s => ({
+      start: s.start, end: s.end, type: s.type, value: s.value,
+    }));
+    renderEditor();
+  } catch (e) {
+    if (epoch !== editEpoch) return;
+    statusEl.textContent = "Detection failed: " + (e.message || e);
+    primary.className = "primary primary--action";
+    primary.textContent = "Copy & open ChatGPT →";
+  } finally {
+    redactDetectInFlight = false;
+    updateStatus();
+  }
+}
+
+/** Paste: show busy UI immediately, debounce 200ms before fetch. */
+function handleRedactPaste(text) {
+  editEpoch++;
+  const epoch = editEpoch;
+  clearDetectTimer();
+  state.awaitingReturnPaste = false;
+  state.mode = "redact";
+  state.text = text;
+  state.spans = [];
+  state.hydrateRestored = 0;
+  state.hydrateMissing = 0;
+  renderEditor();
+  pendingRedactSource = "paste";
+  detectTimer = setTimeout(() => {
+    detectTimer = null;
+    pendingRedactSource = null;
+    runRedactDetectionForEpoch(epoch);
+  }, 200);
+  updateStatus();
+}
+
+function onPaste(e) {
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  const raw = cd.getData("text");
+  if (!raw) return;
+  e.preventDefault();
+  const text = normalizePastedText(raw);
+  const forHydrate = stripHydrationWrappers(text);
+  if (hasUsablePlaceholders(forHydrate)) {
+    handleHydratePaste(forHydrate);
+  } else {
+    handleRedactPaste(text);
+  }
+}
+
+// Catch paste anywhere on the page so the user never needs to focus the editor
+window.addEventListener("paste", onPaste);
+
+// Typing and local edits (contenteditable)
+editor.addEventListener("input", () => {
+  if (editorSyncing) return;
+  if (state.mode === "hydrate") {
+    state.text = extractPlainTextFromEditor();
+    updateStatus();
+    return;
+  }
+  editEpoch++;
+  const epoch = editEpoch;
+  clearDetectTimer();
+  state.awaitingReturnPaste = false;
+  const t = extractPlainTextFromEditor();
+  state.text = t;
+  if (!t) {
+    state.mode = null;
+    state.spans = [];
+    state.awaitingReturnPaste = false;
+    editorSyncing = true;
+    renderEditor();
+    editorSyncing = false;
+    updateStatus();
+    return;
+  }
+  state.mode = "redact";
+  state.spans = [];
+  const caret = getCaretPlainOffset();
+  editorSyncing = true;
+  editor.innerHTML = escapeHTML(t) + EDIT_CARET_ZWSP;
+  editor.classList.remove("editor-placeholder");
+  editorSyncing = false;
+  if (caret !== null) setCaretPlainOffset(Math.min(caret, t.length));
+  else editor.focus();
+  updateStatus();
+  pendingRedactSource = "type";
+  detectTimer = setTimeout(() => {
+    detectTimer = null;
+    pendingRedactSource = null;
+    if (epoch !== editEpoch) return;
+    runRedactDetectionForEpoch(epoch);
+  }, 450);
+  updateStatus();
+});
+
+// ----- selection-based tagging -------------------------------------------
+
+const TAG_BUTTONS = [
+  { label: "Person",   target: "PERSON" },
+  { label: "Company",  target: "ORG" },
+  { label: "Location", target: "LOCATION" },
+  { label: "Contact",  target: "CONTACT" },
+  { label: "Other",    target: "ITEM" },
+];
+
+function buildPopup() {
+  popup.innerHTML = "";
+  const rowTag = document.createElement("div");
+  rowTag.className = "popup-row";
+  for (const b of TAG_BUTTONS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = b.label;
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();           // keep selection alive
+      addEntityFromSelection(b.target);
+    });
+    rowTag.appendChild(btn);
+  }
+  const divider = document.createElement("div");
+  divider.className = "popup-divider";
+  divider.textContent = "Add to database";
+
+  const rowDb = document.createElement("div");
+  rowDb.className = "popup-row";
+  const btnName = document.createElement("button");
+  btnName.type = "button";
+  btnName.className = "popup-add-db";
+  btnName.textContent = "Save as name";
+  btnName.title = "Append to data/custom_names.txt (local)";
+  btnName.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addSelectionToDictionary("name");
+  });
+  const btnOrg = document.createElement("button");
+  btnOrg.type = "button";
+  btnOrg.className = "popup-add-db";
+  btnOrg.textContent = "Save as company";
+  btnOrg.title = "Append to data/construction_orgs.txt (local)";
+  btnOrg.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addSelectionToDictionary("org");
+  });
+  rowDb.appendChild(btnName);
+  rowDb.appendChild(btnOrg);
+
+  popup.appendChild(rowTag);
+  popup.appendChild(divider);
+  popup.appendChild(rowDb);
+}
+buildPopup();
+
+async function addSelectionToDictionary(kind) {
+  if (!pendingSelection) return;
+  const { start, end } = pendingSelection;
+  let s = start, e = end;
+  while (s < e && /\s/.test(state.text[s])) s++;
+  while (e > s && /\s/.test(state.text[e - 1])) e--;
+  if (s === e) {
+    popup.classList.add("hidden");
+    pendingSelection = null;
+    return;
+  }
+  const trimmedValue = state.text.slice(s, e);
+
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  window.getSelection().removeAllRanges();
+
+  try {
+    const res = await fetch("/api/dictionary/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, text: trimmedValue }),
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) { /* ignore */ }
+    if (!res.ok) {
+      statusEl.textContent = "Could not save: " + (data.error || res.statusText);
+      return;
+    }
+    if (data.duplicate) {
+      statusEl.textContent = "Already in " + (data.file || "dictionary") + ".";
+    } else {
+      statusEl.textContent = "Saved to " + (data.file || "dictionary") + ". Re-detecting…";
+    }
+    if (state.mode === "redact" && state.text) {
+      editEpoch++;
+      const epoch = editEpoch;
+      runRedactDetectionForEpoch(epoch);
+    }
+  } catch (err) {
+    statusEl.textContent = "Save failed: " + (err.message || String(err));
+  }
+}
+
+function getEditorOffsets(range) {
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) {
+    return null;
+  }
+  const before = document.createRange();
+  before.setStart(editor, 0);
+  before.setEnd(range.startContainer, range.startOffset);
+  const start = before.toString().length;
+  const beforeEnd = document.createRange();
+  beforeEnd.setStart(editor, 0);
+  beforeEnd.setEnd(range.endContainer, range.endOffset);
+  const end = beforeEnd.toString().length;
+  if (start === end) return null;
+  return start < end ? { start, end } : { start: end, end: start };
+}
+
+function positionPopupNearRect(rect, clientX, clientY) {
+  popup.classList.remove("hidden");
+  const popupRect = popup.getBoundingClientRect();
+  let left = rect.left + (rect.width - popupRect.width) / 2;
+  let top = rect.top - popupRect.height - 8;
+  if (typeof clientX === "number" && typeof clientY === "number") {
+    left = clientX - popupRect.width / 2;
+    top = clientY - popupRect.height - 8;
+  }
+  const minLeft = 8;
+  const maxLeft = document.documentElement.clientWidth - popupRect.width - 8;
+  if (left < minLeft) left = minLeft;
+  if (left > maxLeft) left = maxLeft;
+  if (top < 4) {
+    top = (typeof clientY === "number" ? clientY : rect.bottom) + 8;
+  }
+  popup.style.left = left + "px";
+  popup.style.top = top + "px";
+}
+
+function showPopupForSelection() {
+  if (state.mode !== "redact" || state.awaitingReturnPaste) {
+    popup.classList.add("hidden");
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    popup.classList.add("hidden");
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  const offsets = getEditorOffsets(range);
+  if (!offsets) {
+    popup.classList.add("hidden");
+    return;
+  }
+  pendingSelection = offsets;
+  const rect = range.getBoundingClientRect();
+  positionPopupNearRect(rect);
+}
+
+editor.addEventListener("contextmenu", (e) => {
+  if (state.mode !== "redact" || state.awaitingReturnPaste) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return;
+  const offsets = getEditorOffsets(range);
+  if (!offsets) return;
+  e.preventDefault();
+  pendingSelection = offsets;
+  const rect = range.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    positionPopupNearRect(rect, e.clientX, e.clientY);
+  });
+});
+
+function addEntityFromSelection(target) {
+  if (!pendingSelection) return;
+  const { start, end } = pendingSelection;
+  const value = state.text.slice(start, end).trim()
+    ? state.text.slice(start, end)
+    : null;
+  if (!value) { popup.classList.add("hidden"); return; }
+
+  // Trim whitespace from the edges of the selection
+  let s = start, e = end;
+  while (s < e && /\s/.test(state.text[s])) s++;
+  while (e > s && /\s/.test(state.text[e - 1])) e--;
+  if (s === e) { popup.classList.add("hidden"); return; }
+  const trimmedValue = state.text.slice(s, e);
+
+  let type = target;
+  if (target === "CONTACT") {
+    type = sniffContactType(trimmedValue);
+  }
+
+  // Drop any existing spans that overlap the new one
+  state.spans = state.spans.filter(sp => !(sp.start < e && s < sp.end));
+  state.spans.push({ start: s, end: e, type, value: trimmedValue });
+  state.spans.sort((a, b) => a.start - b.start);
+  state.awaitingReturnPaste = false;
+
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  window.getSelection().removeAllRanges();
+  renderEditor();
+  updateStatus();
+}
+
+document.addEventListener("mousedown", (e) => {
+  if (popup.contains(e.target)) return;
+  popup.classList.add("hidden");
+});
+
+document.addEventListener("mouseup", (e) => {
+  if (popup.contains(e.target)) return;
+  // Defer so the selection is finalized
+  setTimeout(showPopupForSelection, 0);
+});
+
+// Click an existing highlight to remove it
+editor.addEventListener("click", (e) => {
+  // If user is mid-selection, do not untag
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) return;
+  const target = e.target.closest("span.ent");
+  if (!target) return;
+  const i = parseInt(target.dataset.i, 10);
+  if (Number.isNaN(i)) return;
+  const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+  const sp = sorted[i];
+  if (!sp) return;
+  state.spans = state.spans.filter(x => x !== sp);
+  state.awaitingReturnPaste = false;
+  renderEditor();
+  updateStatus();
+});
+
+// ----- primary action ----------------------------------------------------
+
+primary.addEventListener("click", async () => {
+  if (state.mode === "redact") {
+    if (state.awaitingReturnPaste) return;
+    const { redacted, mapping } = buildRedacted();
+    try {
+      await navigator.clipboard.writeText(wrapRedactedForClipboard(redacted));
+    } catch (e) {
+      statusEl.textContent = "Clipboard blocked: " + e.message;
+      return;
+    }
+    saveMapping({ ...loadMapping(), ...mapping });
+    state.awaitingReturnPaste = true;
+    editEpoch++;
+    clearDetectTimer();
+    window.open(CHATGPT_URL, "_blank", "noopener");
+    renderEditor();
+    updateStatus();
+  } else if (state.mode === "hydrate") {
+    try {
+      await navigator.clipboard.writeText(state.text);
+      statusEl.textContent = "Copied!";
+      setTimeout(() => updateStatus(), 1300);
+    } catch (e) {
+      statusEl.textContent = "Clipboard blocked: " + e.message;
+    }
+  }
+});
+
+// ----- clear -------------------------------------------------------------
+
+clearLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (clearLink.classList.contains("clear--inactive")) return;
+  clearDetectTimer();
+  editEpoch++;
+  localStorage.removeItem(STORAGE_KEY);
+  state = {
+    mode: null, text: "", spans: [],
+    hydrateRestored: 0, hydrateMissing: 0,
+    awaitingReturnPaste: false,
+  };
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  renderEditor();
+  updateStatus();
+});
+
+// initial paint (ZWSP + placeholder so focus yields a real caret)
+renderEditor();
+updateStatus();
+</script>
+</body>
+</html>
