@@ -27,12 +27,13 @@ def test_full_name_detection():
     assert "Andersson" in found
 
 
-def test_case_insensitive():
+def test_lowercase_name_not_tagged_dictionary_person():
+    """Dictionary PERSON requires a capitalized token; lowercase 'johan' is skipped."""
     text = "JOHAN and johan are the same name."
     spans = detect_dictionary(text)
     found = _texts(spans)
     assert "JOHAN" in found
-    assert "johan" in found
+    assert "johan" not in found
 
 
 def test_whole_word_only():
