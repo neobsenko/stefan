@@ -231,3 +231,73 @@ def test_org_span_wins_over_nested_location_for_stockholm_name():
     spacy = [(0, 9, "LOCATION", "Stockholm")]
     merged = merge_spans(regex, [], spacy, text=text)
     assert merged == [(0, len(text), "ORG", text)]
+
+
+def test_person_keeps_wider_span_when_spacy_tags_substrings_as_location_or_org():
+    text = "Mohammed bin Salman Al-Rashid och Yusuf ibn Hassan"
+    dict_ = [
+        (0, 29, "PERSON", "Mohammed bin Salman Al-Rashid"),
+        (34, 50, "PERSON", "Yusuf ibn Hassan"),
+    ]
+    spacy = [
+        (0, 9, "LOCATION", "Mohammed"),
+        (44, 50, "ORG", "Hassan"),
+    ]
+    merged = merge_spans([], dict_, spacy, text=text)
+    assert merged == [
+        (0, 29, "PERSON", "Mohammed bin Salman Al-Rashid"),
+        (34, 50, "PERSON", "Yusuf ibn Hassan"),
+    ]
+
+
+def test_stopword_skicka_not_tagged_as_person():
+    text = "Skicka till HR på Skanska så fixar de det"
+    redacted, mapping = redact(text, use_spacy=False)
+    assert "Skicka" in redacted
+    assert "Skicka" not in mapping.values()
+
+
+def test_entities_do_not_span_line_breaks_in_signature_block():
+    text = (
+        "Anna-Lena Sjöberg-Wikström\n"
+        "Projektledare\n"
+        "NCC Sverige AB | Org.nr: 556034-5174"
+    )
+    redacted, mapping = redact(text, use_spacy=False)
+    lines = redacted.replace("\r\n", "\n").split("\n")
+    assert lines[0].startswith("PERSON_")
+    assert lines[1] == "Projektledare"
+    assert "Projektledare" not in mapping.values()
+    assert "PERSON_9_1ORG" not in redacted.replace(" ", "")
+    assert mapping["PERSON_1"] == "Anna-Lena Sjöberg-Wikström"
+
+
+def test_redact_arabic_style_names_end_to_end():
+    text = (
+        "Mohammed bin Salman Al-Rashid, Yusuf bin Hassan, Khalid Al-Hassan, "
+        "Abu Bakr ibn Yusuf och Mohammed al-Sayed."
+    )
+    redacted, mapping = redact(text, use_spacy=False)
+    for phrase in (
+        "Mohammed bin Salman Al-Rashid",
+        "Yusuf bin Hassan",
+        "Khalid Al-Hassan",
+        "Abu Bakr ibn Yusuf",
+        "Mohammed al-Sayed",
+    ):
+        assert phrase in mapping.values()
+
+
+def test_redact_bouygues_construction_and_intl_org_suffixes():
+    text = (
+        "Partner: Bouygues Construction, Schneider Electric SA, Siemens AG, "
+        "Wienerberger International."
+    )
+    redacted, mapping = redact(text, use_spacy=False)
+    for phrase in (
+        "Bouygues Construction",
+        "Schneider Electric SA",
+        "Siemens AG",
+        "Wienerberger International",
+    ):
+        assert phrase in mapping.values()

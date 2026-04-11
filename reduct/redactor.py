@@ -54,7 +54,18 @@ def redact(text: str, use_spacy: bool = True) -> Tuple[str, Dict[str, str]]:
             type_counters[entity_type] = type_counters.get(entity_type, 0) + 1
             placeholder = f"{entity_type}_{type_counters[entity_type]}"
             value_to_placeholder[key] = placeholder
+            existing = mapping.get(placeholder)
+            if existing is not None and existing != original:
+                raise RuntimeError(
+                    f"Placeholder collision for {placeholder}: {existing!r} vs {original!r}"
+                )
             mapping[placeholder] = original
+        else:
+            existing = mapping.get(placeholder)
+            if existing is not None and existing != original:
+                raise RuntimeError(
+                    f"Placeholder collision for {placeholder}: {existing!r} vs {original!r}"
+                )
         replacements.append((start, end, placeholder))
 
     # Apply replacements right-to-left so earlier offsets stay valid

@@ -10,8 +10,11 @@
       --bg: #161616;
       --text: #e8e8e8;
       --muted: #888;
-      --accent: #2a6df4;
-      --accent-hover: #4080ff;
+      --accent: #22c55e;
+      --accent-hover: #4ade80;
+      --accent-deep: #15803d;
+      --accent-glow: rgba(34, 197, 94, 0.45);
+      --accent-glow-soft: rgba(34, 197, 94, 0.18);
       --c-person:   rgba(96, 165, 250, 0.2);
       --c-org:      rgba(168, 85, 247, 0.2);
       --c-location: rgba(74, 222, 128, 0.2);
@@ -24,6 +27,8 @@
     @media (prefers-reduced-motion: reduce) {
       #editor span.ent { transition: none; }
       .primary { transition: none; }
+      .primary.primary--action:hover:not(:disabled) { transform: none; }
+      .toolbar-btn { transition: none; }
     }
     * { box-sizing: border-box; }
     html, body {
@@ -43,22 +48,27 @@
     }
     .app {
       position: relative;
-      width: min(100%, 58rem);
+      width: min(100%, 64rem);
       max-width: 100%;
-      min-height: min(76vh, 42rem);
-      max-height: min(90vh, 52rem);
+      /* Fixed height so only the editor scrolls — primary button stays in view */
+      height: min(92vh, 56rem);
+      max-height: min(92vh, 56rem);
       margin: 0 auto;
-      padding: 1.15rem 1.5rem 2.35rem;
+      padding: 0.85rem 1.25rem 1rem;
       background: var(--window);
-      border: 1px solid var(--window-edge);
+      border: 1px solid rgba(74, 222, 128, 0.12);
       border-radius: 16px;
       box-shadow:
         0 0 0 1px rgba(255,255,255,0.04) inset,
         0 20px 50px rgba(0,0,0,0.5),
-        0 4px 16px rgba(0,0,0,0.35);
+        0 4px 16px rgba(0,0,0,0.35),
+        0 0 80px rgba(34, 197, 94, 0.06);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+    .app-header {
+      flex-shrink: 0;
     }
     .brand {
       font-size: 12px;
@@ -70,19 +80,22 @@
       flex-shrink: 0;
     }
     .tagline {
-      font-size: 15px;
-      line-height: 1.45;
+      font-size: 14px;
+      line-height: 1.4;
       color: #b8b8b8;
-      margin: 0 0 0.85rem;
-      max-width: 42em;
+      margin: 0 0 0.55rem;
+      max-width: 46em;
       flex-shrink: 0;
+    }
+    @media (min-width: 900px) {
+      .tagline { font-size: 15px; margin-bottom: 0.65rem; }
     }
     .toolbar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.5rem 0.75rem;
-      margin-bottom: 0.65rem;
+      margin-bottom: 0.5rem;
       flex-shrink: 0;
     }
     .toolbar-btn {
@@ -91,24 +104,43 @@
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
-      color: var(--text);
-      background: #2c2c2c;
-      border: 1px solid #444;
+      color: #ecfdf5;
+      background: linear-gradient(180deg, #1a3022 0%, #13251a 100%);
+      border: 1px solid rgba(74, 222, 128, 0.4);
       border-radius: 10px;
       cursor: pointer;
+      box-shadow:
+        0 0 0 1px rgba(21, 128, 61, 0.35) inset,
+        0 2px 8px rgba(0, 0, 0, 0.35),
+        0 0 18px var(--accent-glow-soft);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.15s ease;
     }
-    .toolbar-btn:hover { background: #353535; border-color: #555; }
+    .toolbar-btn:hover {
+      background: linear-gradient(180deg, #224d32 0%, #1a3022 100%);
+      border-color: rgba(134, 239, 172, 0.65);
+      box-shadow:
+        0 0 0 1px rgba(74, 222, 128, 0.25) inset,
+        0 4px 14px rgba(0, 0, 0, 0.4),
+        0 0 28px var(--accent-glow);
+    }
     .toolbar-btn:focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid #4ade80;
       outline-offset: 2px;
     }
     .toolbar-hint {
       font-size: 13px;
       color: var(--muted);
     }
+    .editor-shell {
+      flex: 1 1 0;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
     #editor {
       flex: 1 1 0;
-      min-height: 10rem;
+      min-height: 0;
       min-width: 0;
       font-size: 19px;
       line-height: 1.65;
@@ -127,7 +159,9 @@
       tab-size: 4;
     }
     #editor:focus-visible {
-      box-shadow: 0 0 0 2px rgba(42, 109, 244, 0.45);
+      box-shadow:
+        0 0 0 2px rgba(34, 197, 94, 0.55),
+        0 0 24px var(--accent-glow-soft);
     }
     /* Placeholder when empty (ZWSP in DOM so caret can exist). */
     #editor.editor-placeholder:not(:focus)::before {
@@ -152,7 +186,25 @@
     #editor span.ent.SSN      { background: var(--c-secret); }
     #editor span.ent.IP       { background: var(--c-secret); }
     #editor span.ent.ITEM     { background: var(--c-other); }
-    .bottom { margin-top: 1.1rem; }
+    .action-bar {
+      flex-shrink: 0;
+      margin-top: 0.65rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      background: linear-gradient(180deg, rgba(26, 26, 26, 0) 0%, var(--window) 18%);
+    }
+    .action-bar-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.45rem;
+    }
+    .action-bar-row .status {
+      margin-top: 0;
+      flex: 1;
+      min-width: 0;
+    }
     .primary {
       width: 100%;
       min-height: 48px;
@@ -160,23 +212,41 @@
       font-size: 17px;
       font-weight: 600;
       border: none;
-      border-radius: 10px;
-      transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+      border-radius: 12px;
+      transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease,
+        box-shadow 0.2s ease, transform 0.15s ease;
     }
     .primary.primary--action {
-      background: var(--accent);
-      color: white;
+      color: #f0fdf4;
       cursor: pointer;
+      background: linear-gradient(165deg, #4ade80 0%, var(--accent) 38%, var(--accent-deep) 100%);
+      box-shadow:
+        0 0 0 1px rgba(187, 247, 208, 0.35) inset,
+        0 4px 16px rgba(0, 0, 0, 0.45),
+        0 0 28px var(--accent-glow),
+        0 0 56px var(--accent-glow-soft);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
     }
-    .primary.primary--action:hover:not(:disabled) { background: var(--accent-hover); }
+    .primary.primary--action:hover:not(:disabled) {
+      background: linear-gradient(165deg, #86efac 0%, #4ade80 40%, var(--accent) 100%);
+      box-shadow:
+        0 0 0 1px rgba(240, 253, 244, 0.45) inset,
+        0 6px 22px rgba(0, 0, 0, 0.5),
+        0 0 40px rgba(74, 222, 128, 0.55),
+        0 0 80px var(--accent-glow-soft);
+      transform: translateY(-1px);
+    }
     .primary:focus-visible {
-      outline: 2px solid #7eb0ff;
-      outline-offset: 2px;
+      outline: 2px solid #86efac;
+      outline-offset: 3px;
     }
     .primary.primary--busy {
-      background: #2a3f6e;
-      color: #c8d8ff;
+      background: linear-gradient(180deg, #1e3f2e 0%, #152922 100%);
+      color: #bbf7d0;
       cursor: wait;
+      box-shadow:
+        0 0 0 1px rgba(34, 197, 94, 0.2) inset,
+        0 0 24px var(--accent-glow-soft);
     }
     .primary.primary--wait {
       background: transparent;
@@ -186,11 +256,21 @@
       pointer-events: none;
     }
     .primary.primary--success {
-      background: #1d6b45;
-      color: #e8fff0;
+      background: linear-gradient(165deg, #34d399 0%, #059669 55%, #047857 100%);
+      color: #ecfdf5;
       cursor: pointer;
+      box-shadow:
+        0 0 0 1px rgba(167, 243, 208, 0.3) inset,
+        0 4px 16px rgba(0, 0, 0, 0.4),
+        0 0 26px rgba(16, 185, 129, 0.4);
     }
-    .primary.primary--success:hover:not(:disabled) { background: #248f5a; }
+    .primary.primary--success:hover:not(:disabled) {
+      background: linear-gradient(165deg, #6ee7b7 0%, #10b981 50%, #059669 100%);
+      box-shadow:
+        0 0 0 1px rgba(236, 253, 245, 0.35) inset,
+        0 6px 22px rgba(0, 0, 0, 0.45),
+        0 0 36px rgba(52, 211, 153, 0.45);
+    }
     .primary:disabled {
       opacity: 0.85;
       cursor: default;
@@ -202,15 +282,17 @@
       min-height: 1.25em;
       text-align: left;
     }
+    .action-bar .primary {
+      margin-top: 0;
+    }
     .clear {
-      position: absolute;
-      bottom: 0.65rem;
-      right: 1rem;
-      font-size: 12px;
-      color: #666;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: #888;
       text-decoration: none;
       cursor: pointer;
-      padding: 4px 6px;
+      padding: 4px 2px;
+      white-space: nowrap;
     }
     .clear:hover:not(.clear--inactive) { color: var(--text); }
     .clear.clear--inactive {
@@ -261,26 +343,35 @@
     }
     .popup button:hover { background: rgba(255,255,255,0.09); }
     .popup button.popup-add-db {
-      color: #9ecbff;
+      color: #86efac;
     }
-    .popup button.popup-add-db:hover { background: rgba(42, 109, 244, 0.2); }
+    .popup button.popup-add-db:hover {
+      background: rgba(34, 197, 94, 0.18);
+      box-shadow: 0 0 14px var(--accent-glow-soft);
+    }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="app">
-    <div class="brand">Stefan</div>
-    <p class="tagline">Döljer namn, nummer och känsliga uppgifter innan du klistrar in i AI. Körs lokalt i din webbläsare.</p>
-    <div class="toolbar">
-      <button type="button" class="toolbar-btn" id="pasteFromClipboard">Klistra in text</button>
-      <span class="toolbar-hint">eller tryck Ctrl+V i rutan nedan</span>
+    <div class="app-header">
+      <div class="brand">Stefan</div>
+      <p class="tagline">Döljer namn, nummer och känsliga uppgifter innan du klistrar in i AI. Körs lokalt i din webbläsare.</p>
+      <div class="toolbar">
+        <button type="button" class="toolbar-btn" id="pasteFromClipboard">Klistra in text</button>
+        <span class="toolbar-hint">eller tryck Ctrl+V i rutan nedan</span>
+      </div>
     </div>
-    <div id="editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Text att anonymisera"></div>
-    <div class="bottom">
+    <div class="editor-shell">
+      <div id="editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Text att anonymisera"></div>
+    </div>
+    <div class="action-bar">
       <button type="button" id="primary" class="primary hidden" aria-hidden="true"></button>
-      <div id="status" class="status"></div>
+      <div class="action-bar-row">
+        <div id="status" class="status"></div>
+        <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Börja om</a>
+      </div>
     </div>
-    <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Börja om</a>
   </div>
   <div id="popup" class="popup hidden"></div>
 

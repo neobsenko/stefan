@@ -65,3 +65,59 @@ Konkurrensverket
 Konsumentverket
 IMY
 Datainspektionen
+Handelsbanken
+Swedbank
+Nordea
+Danske Bank
+Länsförsäkringar Bank
+ICA Banken
+Skandiabanken
+SBAB
+Klarna Bank
+Avanza
+Nordnet
+Unionen
+Byggnads
+IF Metall
+Kommunal
+Vision
+Vårdförbundet
+Lärarförbundet
+Lärarnas Riksförbund
+Sveriges Ingenjörer
+Akademikerförbundet SSR
+Sveriges Arkitekter
+Saco
+TCO
+LO
+Almega
+Svenskt Näringsliv
+Företagarna
+Karolinska Institutet
+Karolinska Universitetssjukhuset
+Sahlgrenska Universitetssjukhuset
+Akademiska Sjukhuset
+Norrlands Universitetssjukhus
+Skånes Universitetssjukhus
+Region Stockholm
+Region Västra Götaland
+Region Skåne
+Bosch Rexroth
+Hägglund Bygg & Entreprenad AB
+Saint-Gobain Sweden AB
+Saint-Gobain Glass
+Saint-Gobain Weber
+Heidelberg Materials Sverige AB
+Arbetsförmedlingen
+Pensionsmyndigheten
+Riksbanken
+Finansinspektionen
+Integritetsskyddsmyndigheten
+PTS
+Post- och telestyrelsen
+Jordbruksverket
+Skogsstyrelsen
+Statens fastighetsverk
+Riksantikvarieämbetet
+Vetenskapsrådet
+Vinnova

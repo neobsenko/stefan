@@ -21,6 +21,7 @@ _ORG_LINKER_WORDS = frozenset(
         "International",
         "Nordic",
         "Scandinavia",
+        "Construction",
     }
 )
 
@@ -35,7 +36,16 @@ _PRIORITY = {
 _MAX_PERSON_WS_GAP = 48
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _PERSON_HYPHEN_TAIL_RE = re.compile(
-    r"-(?:[A-ZÀ-ÖØ-ÝÅÄÖ][A-Za-zÀ-ÖØ-öø-ÿÅÄÖåäö'’\-]*)"
+    r"-(?:[A-ZÀ-ÖØ-ÝÅÄÖÇĞIŞÜČĎĚŇŘŠŤŮŽĀĒĪŌŪĶĻŅȘȚŐŰ]"
+    r"[A-Za-zÀ-ÖØ-öø-ÿÅÄÖåäöçğışüčďěňřšťůžāēīōūķļņșțőű''\-]*)"
+)
+
+# Gap pattern for adjacent PERSON merging: plain whitespace/tabs OR a hyphen with optional spaces.
+_PERSON_GAP_RE = re.compile(r"(?:[ \t]+|[ \t]*-[ \t]*)")
+
+# Quoted nickname gap: " \s+ \"Nick\" \s+ " between two PERSON spans.
+_QUOTED_NICK_RE = re.compile(
+    r'^[ \t]+["\u201c\u201d][A-Za-zÀ-ÿ\-]+["\u201c\u201d][ \t]+$'
 )
 
 
@@ -54,7 +64,18 @@ def _filter_stopword_spans(
     stopwords = _load_stopwords()
     if not stopwords:
         return spans
-    return [span for span in spans if span[3] not in stopwords]
+    out: List[Tuple[int, int, str, str, int]] = []
+    for span in spans:
+        value = span[3]
+        if value in stopwords:
+            continue
+        # Remove spans that are entirely composed of stopword tokens
+        # (e.g. "Norska Polska Finska" merged as one PERSON span).
+        tokens = re.findall(r"\b[\w\.-]+\b", value, re.UNICODE)
+        if tokens and all(tok in stopwords for tok in tokens):
+            continue
+        out.append(span)
+    return out
 
 
 def _overlaps(a: Tuple[int, int], b: Tuple[int, int]) -> bool:
@@ -66,10 +87,12 @@ def _merge_adjacent_persons(
     spans: List[Tuple[int, int, str, str]],
     text: str,
 ) -> List[Tuple[int, int, str, str]]:
-    """Merge adjacent PERSON spans separated only by whitespace (bounded length).
+    """Merge adjacent PERSON spans separated only by whitespace, hyphen, or quoted nickname.
 
     Repeats until a full pass produces no further merges, so chains like
     "Erik Anders Andersson" collapse into a single span.
+    Also merges A + "Nick" + B when all three are adjacent PERSON spans
+    and the middle one is wrapped in quotes.
     """
     spans = sorted(spans, key=lambda s: s[0])
     while True:
@@ -77,15 +100,29 @@ def _merge_adjacent_persons(
         changed = False
         i = 0
         while i < len(spans):
+            # Try 3-span quoted nickname merge: PERSON "PERSON" PERSON
+            if i + 2 < len(spans):
+                a, b, c = spans[i], spans[i + 1], spans[i + 2]
+                if a[2] == "PERSON" and b[2] == "PERSON" and c[2] == "PERSON":
+                    gap_ab = text[a[1] : b[0]]
+                    gap_bc = text[b[1] : c[0]]
+                    ab_is_quote_open = gap_ab.strip() in ('"', '\u201c', '\u201d')
+                    bc_is_quote_close = gap_bc.strip() in ('"', '\u201c', '\u201d')
+                    if ab_is_quote_open and bc_is_quote_close:
+                        combined = (a[0], c[1], "PERSON", text[a[0] : c[1]])
+                        merged.append(combined)
+                        i += 3
+                        changed = True
+                        continue
+            # Try 2-span merge
             if i + 1 < len(spans):
                 a = spans[i]
                 b = spans[i + 1]
                 if a[2] == "PERSON" and b[2] == "PERSON":
                     gap = text[a[1] : b[0]]
-                    if (
-                        gap
-                        and len(gap) <= _MAX_PERSON_WS_GAP
-                        and re.fullmatch(r"(?:[ \t]+|[ \t]*-[ \t]*)", gap)
+                    if gap and len(gap) <= _MAX_PERSON_WS_GAP and (
+                        _PERSON_GAP_RE.fullmatch(gap)
+                        or _QUOTED_NICK_RE.match(gap)
                     ):
                         combined = (a[0], b[1], "PERSON", text[a[0] : b[1]])
                         merged.append(combined)
@@ -111,12 +148,16 @@ def _extend_hyphenated_person_surnames(
         if entity_type != "PERSON":
             extended.append((start, end, entity_type, original))
             continue
-        m = _PERSON_HYPHEN_TAIL_RE.match(text[end:])
-        if m is None:
+        cur_end = end
+        while True:
+            m = _PERSON_HYPHEN_TAIL_RE.match(text[cur_end:])
+            if m is None:
+                break
+            cur_end += len(m.group(0))
+        if cur_end != end:
+            extended.append((start, cur_end, entity_type, text[start:cur_end]))
+        else:
             extended.append((start, end, entity_type, original))
-            continue
-        new_end = end + len(m.group(0))
-        extended.append((start, new_end, entity_type, text[start:new_end]))
 
     out: List[Tuple[int, int, str, str]] = []
     for span in sorted(extended, key=lambda s: (s[0], -(s[1] - s[0]))):
@@ -143,7 +184,7 @@ def _merge_adjacent_orgs(
     spans: List[Tuple[int, int, str, str]],
     text: str,
 ) -> List[Tuple[int, int, str, str]]:
-    """Merge adjacent ORG spans, or ORGs separated only by linker words (see _ORG_LINKER_WORDS)."""
+    """Merge adjacent ORG spans, or ORGs separated only by linker words."""
     spans = sorted(spans, key=lambda s: s[0])
     while True:
         merged: List[Tuple[int, int, str, str]] = []
@@ -182,6 +223,24 @@ def _merge_non_person(
     return accepted
 
 
+_FIRST_GIVEN_RE = re.compile(
+    r"^("
+    r"[A-Z][\w'']+(?:-[A-Z][\w'']+)+"  # Pia-Maria, Karl-Johan, Mats-Erik
+    r"|[A-Z][\w'']{2,}"
+    r")",
+    re.UNICODE,
+)
+
+
+def _first_given_name(person_slice: str) -> Optional[str]:
+    """Leading given name, including hyphenated forms (e.g. Pia-Maria, Karl-Johan)."""
+    t = person_slice.strip()
+    m = _FIRST_GIVEN_RE.match(t)
+    if not m:
+        return None
+    return m.group(1)
+
+
 def _coreference_person_first_names(
     spans: List[Tuple[int, int, str, str]],
     text: str,
@@ -193,15 +252,27 @@ def _coreference_person_first_names(
     first_to_full: Dict[str, Set[str]] = {}
 
     for start, end, _, original in person_spans:
-        words = re.findall(r"\b\w+\b", text[start:end], re.UNICODE)
-        if len(words) < 2:
+        surface = text[start:end]
+        rest = surface
+        rest = re.sub(
+            r"^(?:bin|ibn|Bin|Ibn|Abu|abu)\s+",
+            "",
+            rest,
+            count=1,
+        )
+        first = _first_given_name(rest)
+        if first is None:
             continue
-        first = words[0]
         if len(first) < 3:
             continue
         if not first[0].isupper():
             continue
+        if first.lower() in {"bin", "ibn", "abu"}:
+            continue
         if first in stopwords:
+            continue
+        remainder = rest[len(first):].strip()
+        if not remainder:
             continue
         first_to_full.setdefault(first, set()).add(original)
 
@@ -252,6 +323,35 @@ def _coreference_person_first_names(
     return out
 
 
+# Non-person types that may be spaCy false positives fully inside a wider PERSON.
+_SUBSUMABLE_IN_PERSON = frozenset({"LOCATION", "ORG"})
+
+
+def _person_blocked_by_non_person(
+    start: int,
+    end: int,
+    blocked: List[Tuple[int, int, str, str, int]],
+) -> bool:
+    """True if this PERSON span must yield to an accepted non-person span.
+
+    spaCy LOCATION/ORG that are fully contained in a wider PERSON are subsumed.
+    EMAIL / PHONE / etc. still block.
+    """
+    for b in blocked:
+        b_start, b_end, b_type = b[0], b[1], b[2]
+        if not _overlaps((start, end), (b_start, b_end)):
+            continue
+        if (
+            b_type in _SUBSUMABLE_IN_PERSON
+            and b[4] == _PRIORITY["spacy"]
+            and start <= b_start
+            and b_end <= end
+        ):
+            continue
+        return True
+    return False
+
+
 def _merge_person_widest(
     spans: List[Tuple[int, int, str, str, int]],
     blocked: List[Tuple[int, int, str, str, int]],
@@ -264,12 +364,46 @@ def _merge_person_widest(
     accepted: List[Tuple[int, int, str, str, int]] = []
     for span in spans:
         start, end = span[0], span[1]
-        if any(_overlaps((start, end), (b[0], b[1])) for b in blocked):
+        if _person_blocked_by_non_person(start, end, blocked):
             continue
         if any(_overlaps((start, end), (a[0], a[1])) for a in accepted):
             continue
         accepted.append(span)
     return accepted
+
+
+def _drop_non_person_subsumed_by_person(
+    accepted_np: List[Tuple[int, int, str, str, int]],
+    accepted_p: List[Tuple[int, int, str, str, int]],
+) -> List[Tuple[int, int, str, str, int]]:
+    """Remove LOCATION/ORG/etc. that lie entirely inside a kept PERSON span."""
+    if not accepted_p:
+        return accepted_np
+    p_boxes = [(s[0], s[1]) for s in accepted_p]
+    out: List[Tuple[int, int, str, str, int]] = []
+    for np in accepted_np:
+        n0, n1 = np[0], np[1]
+        if any(p0 <= n0 and n1 <= p1 for p0, p1 in p_boxes):
+            continue
+        out.append(np)
+    return out
+
+
+def _truncate_span_at_line_break(text: str, start: int, end: int) -> Tuple[int, int]:
+    """Keep only the segment before the first newline; entities must not span lines."""
+    if end <= start:
+        return (start, start)
+    chunk = text[start:end]
+    for sep in ("\n", "\r"):
+        if sep in chunk:
+            chunk = chunk.split(sep)[0]
+            break
+    new_end = start + len(chunk)
+    while new_end > start and text[new_end - 1] in " \t":
+        new_end -= 1
+    if new_end <= start:
+        return (start, start)
+    return (start, new_end)
 
 
 def merge_spans(
@@ -296,11 +430,21 @@ def merge_spans(
         tagged.append((*s, _PRIORITY["spacy"]))
     tagged = _filter_stopword_spans(tagged)
 
+    if text is not None:
+        trimmed: List[Tuple[int, int, str, str, int]] = []
+        for start, end, etype, val, pri in tagged:
+            ns, ne = _truncate_span_at_line_break(text, start, end)
+            if ne <= ns:
+                continue
+            trimmed.append((ns, ne, etype, text[ns:ne], pri))
+        tagged = trimmed
+
     non_person = [t for t in tagged if t[2] != "PERSON"]
     person = [t for t in tagged if t[2] == "PERSON"]
 
     accepted_np = _merge_non_person(non_person)
     accepted_p = _merge_person_widest(person, accepted_np)
+    accepted_np = _drop_non_person_subsumed_by_person(accepted_np, accepted_p)
 
     result = [(s[0], s[1], s[2], s[3]) for s in accepted_np + accepted_p]
     result.sort(key=lambda x: x[0])

@@ -26,7 +26,7 @@ _PATTERNS: List[Tuple[re.Pattern, int]] = [
     ),
     (
         re.compile(
-            r"(?:Från|From):\s*"
+            r"(?<!\w)(?:Från|From):\s*"
             r"([A-ZÄÖÅĄĆĘŁŃÓŚŹŻ][a-zäöåA-ZÄÖÅĄĆĘŁŃÓŚŹŻ\-]+"
             r"(?:[ \t]+[A-ZÄÖÅĄĆĘŁŃÓŚŹŻ][a-zäöåA-ZÄÖÅĄĆĘŁŃÓŚŹŻ\-]+){0,2})",
             re.IGNORECASE,
@@ -35,7 +35,7 @@ _PATTERNS: List[Tuple[re.Pattern, int]] = [
     ),
     (
         re.compile(
-            r"(?:Till|To):\s*"
+            r"(?<!\w)(?:Till|To):\s*"
             r"([A-ZÄÖÅĄĆĘŁŃÓŚŹŻ][a-zäöåA-ZÄÖÅĄĆĘŁŃÓŚŹŻ\-]+"
             r"(?:[ \t]+[A-ZÄÖÅĄĆĘŁŃÓŚŹŻ][a-zäöåA-ZÄÖÅĄĆĘŁŃÓŚŹŻ\-]+){0,2})",
             re.IGNORECASE,

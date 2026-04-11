@@ -9,6 +9,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 _ORG_DICTIONARY_FILES = (
     "swedish_org_acronyms.txt",
     "construction_orgs.txt",
+    "swedish_insurance_finance.txt",
 )
 
 
