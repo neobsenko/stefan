@@ -35,20 +35,4 @@ stefan serve
 
 See `stefan serve --help` for options including `--port 5000` (no admin required) and `--no-spacy` (regex-only, faster startup).
 
----
-
-## Repository structure
-
-```
-stefan/
-├── cli.py           # stefan redact / serve / hydrate commands
-├── redactor.py      # Core redaction logic
-├── hydrator.py      # Placeholder rehydration
-├── web.py           # Flask web server
-├── detectors/       # Detection modules (regex, dictionary, morphology, etc.)
-├── data/            # Dictionary files
-└── static/
-    └── index.html   # Web UI (single-page app)
-```
-
 For details on how detection works, detector priorities, and how to extend the system, see `AGENTS.md`.

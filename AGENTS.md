@@ -66,7 +66,7 @@ Post-processing in `detect_regex`:
 - **Phone protection**: IBAN/PAYMENT_REF/BANKGIRO/PLUSGIRO/BANK_ACCOUNT spans are protected from PHONE overlap
 - **ORG_NR over SSN**: if a digit span matches both labeled ORG_NR and bare SSN, keep ORG_NR only
 - **OCR over KID**: if OCR and KID overlap, keep OCR only
-- **LOCATION leading prose trim**: drops sentence-openers like `Besök`, `Ring`, `Skicka` before street addresses
+- **LOCATION leading prose trim**: drops sentence-openers before street addresses — `Besök`, `Ring`, `Skicka`, `Kontakta`, `Boka`, `Kom`, `Gå`, `Kommer`, `Möt`, `Se`, `Fråga`, `Hitta`, `Passa`, `Titta`, `Kontor`, `Adress`, `Leverans`
 
 ### 2. context_triggers.py (`detect_context_triggers`)
 
@@ -76,16 +76,19 @@ Patterns:
 - Email greeting: `Hej [Name],`
 - Email sign-offs: `Mvh\n\n[Name]`, `Med vänlig hälsning [Name]`, `Bästa hälsningar\n[Name]`
 - Email headers: `Från: [Name]`, `Till: [Name]`, `Kopia: [Name]`
-- Role introduction: `kontaktperson är [Name]`, `vår VD [Name]`, `handläggaren [Name]`
+- Role introduction: `kontaktperson är/heter [Name]`, `vår VD/chef/platschef/projektledare/koordinator [Name]`
 
 ### 3. dictionary.py (`detect_dictionary`)
 
 Whole-word, case-sensitive lookup against curated name lists. Returns `PERSON` spans. Supports reloading at runtime for the custom names endpoint.
 
-Files in `data/`:
+Files in `data/` (loaded at startup; missing files are silently skipped):
 - `swedish_first_names.txt` — Swedish given names
 - `swedish_surnames.txt` — Swedish surnames
 - `polish_names.txt` — Polish names (male/female, morphologically aware)
+- `finnish_names.txt` — Finnish names
+- `arabic_names_transliterated.txt` — Arabic names (Latin transliteration)
+- `slavic_names.txt` — Slavic names (Latin transliteration)
 - `custom_names.txt` — user-managed additions (appended at runtime via `/api/dictionary/add`)
 
 Reload function: `reload_name_dictionaries()` — re-reads all files from disk and rebuilds the lookup set.
@@ -112,14 +115,17 @@ Patterns:
 - **Polish surnames**: `-ski`, `-ska`, `-cki`, `-cka`, `-wicz`, `-czyk`
 - **Slavic surnames**: `-enko`, `-ov`, `-ova`, `-ev`, `-eva`
 - **Finnish surnames**: `-nen`, `-la`, `-lä`
-- **Arabic patronymic**: `bin`, `ibn`, `Abu`, `Al-`, `al-`, `el-`, `El-`
+- **Latvian surnames**: `-iņš`, `-iņa`, `-aņš`, `-iņi`
+- **Turkish surnames**: hyphenated compound (e.g. `Yılmaz-Demir`)
+- **Arabic patronymic**: `bin`, `ibn`, `Abu`, `Al-`, `al-`, `el-`, `El-`; also full chains (`Khalid bin Tariq`)
 - **Germanic noble particles**: `von`, `van`, `van der`, `de`, `zu`
-- **French apostrophe particles**: `d'`, `D'`, `l'`, `L'`, `de la`
-- **Irish**: `O'`
+- **French apostrophe particles**: `d'`, `D'`, `l'`, `L'`, `de la`, `du`, `des`
+- **Irish/Scottish**: `O'` (e.g. `O'Sullivan`)
+- **Swedish family collectives**: `Familjen [surname]`
 - **Hyphenated double surnames**: any combination of the above
 - **Hyphenated compound first names**: `Lars-Erik`, `Anna-Karin`, `Per-Olof`, including with quoted nicknames between first name and surname
 
-Token character classes extend to all European special characters: `ä ö å æ ø ą ć ę ł ń ó ś ź ż ç ğ ı ş ü č ď ě ň ř š ť ů ž á é í ó ú ý à è ì ò ù â ê î ô û ë ï ÿ ē ī ū ā ķ ļ ņ ș ț`.
+Token character classes extend to European capitals: `A-ZÄÖÅÆØĄĆĘŁŃÓŚŹŻÇĞIŞÜČĎĚŇŘŠŤŮŽÁÉÍÓÚÝÀÈÌÒÙÂÊÎÔÛËÏŸĀĒĪŌŪĶĻŅȘȚŐŰ`.
 
 ### 6. nlp.py (`detect_spacy`)
 
@@ -177,7 +183,7 @@ Sorted by `(-length, -priority, start)`. Among overlapping PERSON spans, keep th
 3. **Non-PERSON subsumption check** — LOCATION/ORG/etc. fully inside a kept PERSON are dropped
 4. **Adjacent PERSON merge** — merges PERSON spans separated only by whitespace, hyphen, or quoted nickname pattern (`"Nick"`)
 5. **Hyphenated surname extension** — extends PERSON spans with trailing hyphenated surname segments
-6. **Adjacent ORG merge** — merges ORG spans separated only by whitespace or linker words (`Fastigheter`, `Holding`, `Bygg`, `Entreprenad`, `Konsult`, etc.)
+6. **Adjacent ORG merge** — merges ORG spans separated only by whitespace or linker words (`Fastigheter`, `Sverige`, `Holding`, `Holdings`, `Group`, `Bygg`, `Entreprenad`, `Konsult`, `Förvaltning`, `Invest`, `International`, `Nordic`, `Scandinavia`, `Construction`)
 7. **Polish `z o.o.` extension** — extends ORG spans to include trailing `z o.o.`
 8. **Coreference** — scans for standalone first-name mentions of already-tagged PERSONs; links them to the canonical full-name entity. Handles Swedish genitive forms (`Anna` → `Annas`). Suppressed when first names are ambiguous (multiple people share the same first name in the document)
 
@@ -197,11 +203,7 @@ Pattern: `\b(TYPE)_\d+\b` where TYPE is one of `PERSON`, `ORG`, `ORG_NR`, `LOCAT
 
 ## Hydration (`hydrator.py`)
 
-The reverse of redaction. Loads the saved mapping (stored in `localStorage` client-side and server-side audit DB) and replaces all placeholder tokens with their original values.
-
-Placeholder regex: `\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|PAYMENT_REF)_\d+\b`
-
-Unknown placeholders are left untouched.
+The reverse of redaction. Loads the saved mapping (stored in `localStorage` client-side and server-side audit DB) and replaces all placeholder tokens with their original values. Unknown placeholders are left untouched.
 
 ---
 
@@ -243,9 +245,32 @@ Every new rule must be justified by a real false positive or false negative obse
 ## Testing
 
 ```bash
-# Run all tests
 pytest
+```
 
-# Run specific test file
-pytest tests/test_regex.py -v
+---
+
+## Repository structure
+
+```
+stefan/                     ← Python package
+├── cli.py                  # stefan redact / serve / hydrate commands
+├── redactor.py             # Core redaction logic
+├── hydrator.py             # Placeholder rehydration
+├── web.py                  # Flask web server
+├── detectors/
+│   ├── __init__.py
+│   ├── context_triggers.py # Context-based PERSON detection
+│   ├── dictionary.py       # Name dictionary lookup
+│   ├── dictionary_orgs.py  # Org dictionary lookup
+│   ├── merger.py           # Span merging + post-processing
+│   ├── name_morphology.py  # Structural name patterns
+│   ├── nlp.py              # spaCy NER fallback
+│   └── regex.py            # Pattern-based detection
+├── data/                   # Dictionary/thesaurus files
+└── static/
+    └── index.html          # Single-page web UI
+
+tests/
+    test_*.py               # Detector-specific tests
 ```
