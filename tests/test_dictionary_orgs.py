@@ -1,6 +1,6 @@
 """Tests for Swedish org acronym dictionary detection."""
 
-from reduct.detectors.dictionary_orgs import detect_dictionary_orgs
+from stefan.detectors.dictionary_orgs import detect_dictionary_orgs, reload_org_dictionaries
 
 
 def _orgs(spans):
@@ -51,3 +51,21 @@ def test_authority_boverket_detected_as_org():
 def test_authority_trafikverket_detected_as_org():
     spans = detect_dictionary_orgs("Även Trafikverket har hört av sig.")
     assert "Trafikverket" in _orgs(spans)
+
+
+def test_staffing_manpower_bare_word():
+    reload_org_dictionaries()
+    spans = detect_dictionary_orgs("anställd via Manpower som konsult.")
+    assert "Manpower" in _orgs(spans)
+
+
+def test_law_firm_vinge():
+    reload_org_dictionaries()
+    spans = detect_dictionary_orgs("kontaktat Advokatfirman Vinge.")
+    assert "Advokatfirman Vinge" in _orgs(spans)
+
+
+def test_municipal_stadsbyggnadskontoret():
+    reload_org_dictionaries()
+    spans = detect_dictionary_orgs("ärendet hos Stadsbyggnadskontoret.")
+    assert "Stadsbyggnadskontoret" in _orgs(spans)

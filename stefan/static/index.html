@@ -1,0 +1,1803 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <!-- UI bundle: pdf-toolbar-2btn-lazy — pdf.js loads on first PDF use (no blocking CDN). -->
+  <title>Stefan — dölj känslig text</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    @font-face {
+      font-family: "IBM Plex Sans";
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+      src: url("/static/fonts/IBMPlexSans-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+      src: url("/static/fonts/IBMPlexSans-Medium.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Sans";
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+      src: url("/static/fonts/IBMPlexSans-SemiBold.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+      src: url("/static/fonts/IBMPlexMono-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+      src: url("/static/fonts/IBMPlexMono-Medium.ttf") format("truetype");
+    }
+    :root {
+      color-scheme: dark;
+      /* Zinc / Emerald — premium dashboard */
+      --bg-page: #09090b;
+      --bg-surface: #121214;
+      --bg-elevated: #18181b;
+      --zinc-300: #d4d4d8;
+      --zinc-400: #a1a1aa;
+      --zinc-500: #71717a;
+      --zinc-600: #52525b;
+      --zinc-700: #3f3f46;
+      --zinc-800: #27272a;
+      --zinc-100: #f4f4f5;
+      --border-card: rgba(39, 39, 42, 0.5);
+      --emerald-400: #34d399;
+      --emerald-500: #10b981;
+      --emerald-600: #059669;
+      --editor-surface: #0e0e11;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #editor span.ent { transition: none; }
+      .primary { transition: none; }
+      .primary.primary--action:hover:not(:disabled),
+      .primary.primary--success:hover:not(:disabled) { transform: none !important; }
+      .toolbar-btn { transition: none; }
+      .preset-chip { transition: none; }
+      .preset-chip:hover { transform: none !important; }
+      .status-pulse { animation: none !important; }
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg-page);
+      color: var(--zinc-300);
+      font-family: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      /* 16px base improves legibility for readers who prefer larger UI text */
+      font-size: 16px;
+      line-height: 1.55;
+      letter-spacing: -0.02em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body {
+      padding: 28px 24px 32px;
+    }
+    h1, h2 {
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+    h2 { font-size: 1.25rem; }
+    .meta-label {
+      font-size: 0.75rem;
+      color: var(--zinc-500);
+    }
+    .meta-value {
+      font-size: 0.875rem;
+      color: var(--zinc-300);
+    }
+    .mono {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 28px 32px;
+    }
+    .section {
+      margin-bottom: 1.5rem;
+    }
+    .app {
+      position: relative;
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-card);
+      border-radius: 0.875rem;
+      box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .app-header {
+      flex-shrink: 0;
+      overflow: visible;
+      min-width: 0;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.625rem;
+      margin-bottom: 0.5rem;
+      flex-shrink: 0;
+    }
+    .brand {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--zinc-100);
+      letter-spacing: -0.03em;
+      margin: 0;
+    }
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--emerald-400);
+      background: rgba(52, 211, 153, 0.1);
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      letter-spacing: 0.04em;
+    }
+    .tagline {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: var(--zinc-400);
+      margin: 0 0 1.125rem;
+      max-width: 42em;
+      flex-shrink: 0;
+    }
+    .toolbar {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.625rem 1rem;
+      margin-bottom: 0.375rem;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+    /* Two equal visual slots so neither button can be squeezed out by the hint. */
+    .toolbar-pair {
+      display: inline-grid;
+      grid-template-columns: max-content max-content;
+      gap: 0.625rem;
+      align-items: stretch;
+      flex: 0 0 auto;
+    }
+    .toolbar-pair .toolbar-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .toolbar-btn {
+      min-height: 44px;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      letter-spacing: -0.02em;
+      color: var(--zinc-300);
+      background: transparent;
+      border: 1px solid var(--zinc-700);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .toolbar-btn:hover {
+      background: var(--zinc-800);
+      color: #fff;
+      border-color: var(--zinc-600);
+    }
+    .toolbar-btn:focus-visible {
+      outline: 2px solid rgba(16, 185, 129, 0.5);
+      outline-offset: 2px;
+    }
+    .toolbar-hint {
+      font-size: 0.9375rem;
+      color: var(--zinc-500);
+      letter-spacing: -0.02em;
+      line-height: 1.45;
+      flex: 1 1 10rem;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .editor-shell {
+      flex: 0 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .editor-frame {
+      position: relative;
+      background: #0e0e11;
+      border: 1px solid rgba(39, 39, 42, 0.8);
+      border-radius: 0.5625rem;
+      padding: 1.125rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, border-style 0.15s ease;
+    }
+    .editor-shell.editor-drag-active .editor-frame {
+      border-style: dashed;
+      border-color: rgba(52, 211, 153, 0.65);
+      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+    }
+    .editor-drop-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.5625rem;
+      background: rgba(9, 9, 11, 0.82);
+      color: var(--emerald-400);
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+    }
+    .editor-shell.editor-drag-active .editor-drop-overlay {
+      opacity: 1;
+      visibility: visible;
+    }
+    .editor-frame:focus-within {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
+    }
+    #editor {
+      flex: 0 1 auto;
+      min-height: 280px;
+      max-height: min(56vh, 640px);
+      min-width: 0;
+      width: 100%;
+      font-family: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      letter-spacing: -0.02em;
+      color: var(--zinc-300);
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--zinc-700) transparent;
+      user-select: text;
+      cursor: text;
+      outline: none;
+      tab-size: 4;
+    }
+    /* Match site body font; EMAIL/PHONE etc. use .mono but should not switch to mono here */
+    #editor .mono {
+      font-family: inherit;
+    }
+    #editor::-webkit-scrollbar {
+      width: 8px;
+    }
+    #editor::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #editor::-webkit-scrollbar-thumb {
+      background: var(--zinc-700);
+      border-radius: 3px;
+    }
+    #editor::-webkit-scrollbar-thumb:hover {
+      background: var(--zinc-600);
+    }
+    /* Placeholder when empty (ZWSP in DOM so caret can exist). */
+    #editor.editor-placeholder:not(:focus)::before {
+      content: "Klistra in text, ladda upp PDF eller släpp en PDF i fönstret · Ctrl+V";
+      color: var(--zinc-500);
+      pointer-events: none;
+    }
+    #editor span.ent.redaction {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: baseline;
+      max-width: 100%;
+      padding: 0.1875rem 0.5625rem;
+      margin: 0 0.125rem;
+      border-radius: 0.375rem;
+      font-size: inherit;
+      font-family: inherit;
+      font-weight: 500;
+      line-height: inherit;
+      color: var(--zinc-100);
+      white-space: pre-wrap;
+      cursor: pointer;
+      background: rgba(39, 39, 42, 0.85);
+      border: 1px solid rgba(113, 113, 122, 0.5);
+      border-left-width: 2px;
+      border-left-color: rgba(113, 113, 122, 0.85);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    #editor span.ent.redaction:hover {
+      filter: brightness(1.08);
+    }
+    #editor span.ent.PERSON {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.5);
+      border-left-color: rgb(59, 130, 246);
+    }
+    #editor span.ent.LOCATION {
+      background: rgba(249, 115, 22, 0.1);
+      border-color: rgba(249, 115, 22, 0.5);
+      border-left-color: rgb(249, 115, 22);
+    }
+    #editor span.ent.ORG {
+      background: rgba(139, 92, 246, 0.1);
+      border-color: rgba(139, 92, 246, 0.5);
+      border-left-color: rgb(139, 92, 246);
+    }
+    #editor span.ent.ORG_NR {
+      background: rgba(100, 116, 139, 0.1);
+      border-color: rgba(100, 116, 139, 0.5);
+      border-left-color: rgb(100, 116, 139);
+    }
+    #editor span.ent.EMAIL {
+      background: rgba(14, 165, 233, 0.1);
+      border-color: rgba(14, 165, 233, 0.5);
+      border-left-color: rgb(14, 165, 233);
+    }
+    #editor span.ent.PHONE {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.5);
+      border-left-color: rgb(244, 63, 94);
+    }
+    #editor span.ent.URL {
+      background: rgba(20, 184, 166, 0.1);
+      border-color: rgba(20, 184, 166, 0.5);
+      border-left-color: rgb(20, 184, 166);
+    }
+    #editor span.ent.SSN {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.5);
+      border-left-color: rgb(239, 68, 68);
+    }
+    #editor span.ent.IP {
+      background: rgba(6, 182, 212, 0.1);
+      border-color: rgba(6, 182, 212, 0.5);
+      border-left-color: rgb(6, 182, 212);
+    }
+    #editor span.ent.IBAN {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.5);
+      border-left-color: rgb(245, 158, 11);
+    }
+    #editor span.ent.CONTACT {
+      background: rgba(217, 70, 239, 0.1);
+      border-color: rgba(217, 70, 239, 0.5);
+      border-left-color: rgb(217, 70, 239);
+    }
+    #editor span.ent.ITEM {
+      background: rgba(113, 113, 122, 0.1);
+      border-color: rgba(113, 113, 122, 0.5);
+      border-left-color: rgb(113, 113, 122);
+    }
+    .action-bar {
+      flex-shrink: 0;
+      margin-top: 1rem;
+      padding-top: 1.125rem;
+      border-top: 1px solid var(--border-card);
+      background: transparent;
+    }
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.625rem;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .action-bar:has(#primary.hidden) .preset-row {
+      display: none;
+    }
+    .preset-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      font-family: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      color: var(--zinc-400);
+      background: rgba(39, 39, 42, 0.6);
+      border: 1px solid rgba(63, 63, 70, 0.8);
+      border-radius: 0.375rem;
+      user-select: none;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease,
+        color 0.15s ease, border-color 0.15s ease;
+    }
+    .preset-chip:hover:not(.preset-chip--selected) {
+      color: var(--bg-page);
+      background: var(--emerald-400);
+      border-color: rgba(52, 211, 153, 0.5);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 25px rgba(16, 185, 129, 0.3);
+      transform: translateY(-1px);
+    }
+    .preset-chip--selected {
+      color: var(--bg-page);
+      background: var(--emerald-500);
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      font-weight: 600;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    .preset-chip--selected:hover {
+      background: var(--emerald-400);
+      border-color: rgba(52, 211, 153, 0.55);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 25px rgba(16, 185, 129, 0.28);
+      transform: translateY(-1px);
+    }
+    .preset-chip:focus-visible {
+      outline: 2px solid rgba(52, 211, 153, 0.6);
+      outline-offset: 2px;
+    }
+    .action-bar-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .action-bar-row .status-wrap {
+      margin-top: 0;
+      flex: 1;
+      min-width: 0;
+    }
+    .primary {
+      width: 100%;
+      min-height: 56px;
+      padding: 0.875rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      border-radius: 0.5625rem;
+      text-align: center;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    }
+    .primary.primary--action {
+      color: var(--bg-page);
+      cursor: pointer;
+      background: var(--emerald-500);
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    .primary.primary--action:hover:not(:disabled) {
+      background: var(--emerald-400);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 25px rgba(16, 185, 129, 0.3);
+      transform: translateY(-1px);
+    }
+    .primary.primary--action:active:not(:disabled) {
+      transform: translateY(0) scale(0.98);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 12px rgba(16, 185, 129, 0.2);
+    }
+    .primary:focus-visible {
+      outline: 2px solid rgba(52, 211, 153, 0.6);
+      outline-offset: 2px;
+    }
+    .primary.primary--busy {
+      background: var(--zinc-800);
+      color: var(--zinc-300);
+      cursor: wait;
+      box-shadow: none;
+      border: 1px solid var(--border-card);
+      font-weight: 500;
+    }
+    .primary.primary--wait {
+      color: var(--bg-page);
+      cursor: default;
+      pointer-events: none;
+      background: var(--emerald-500);
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      font-weight: 600;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    .primary.primary--success {
+      color: var(--bg-page);
+      cursor: pointer;
+      background: var(--emerald-500);
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    .primary.primary--success:hover:not(:disabled) {
+      background: var(--emerald-400);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 0 25px rgba(16, 185, 129, 0.3);
+      transform: translateY(-1px);
+    }
+    .primary.primary--success:active:not(:disabled) {
+      transform: translateY(0) scale(0.98);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 12px rgba(16, 185, 129, 0.2);
+    }
+    .primary:disabled {
+      opacity: 0.85;
+      cursor: default;
+    }
+    .status-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      margin-top: 0.5rem;
+      min-height: 1.35em;
+    }
+    .status-wrap:not(:has(.status-text:not(:empty))) .status-pulse {
+      display: none;
+    }
+    .status-pulse {
+      flex-shrink: 0;
+      width: 0.5625rem;
+      height: 0.5625rem;
+      border-radius: 9999px;
+      background: var(--emerald-500);
+      animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes status-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-text {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.8125rem;
+      font-weight: 400;
+      color: var(--zinc-500);
+      line-height: 1.45;
+      text-align: left;
+    }
+    .action-bar .primary {
+      margin-top: 0;
+    }
+    .clear {
+      flex-shrink: 0;
+      font-size: 0.9375rem;
+      color: var(--zinc-500);
+      text-decoration: none;
+      cursor: pointer;
+      padding: 0.375rem 0.25rem;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+    }
+    .clear:hover:not(.clear--inactive) { color: var(--zinc-300); }
+    .clear.clear--inactive {
+      color: var(--zinc-700);
+      cursor: default;
+      pointer-events: none;
+    }
+    .popup {
+      position: fixed;
+      background: rgba(24, 24, 27, 0.95);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(63, 63, 70, 0.6);
+      border-radius: 0.875rem;
+      padding: 0.375rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      align-items: stretch;
+      min-width: min(100vw - 16px, 22rem);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+      z-index: 50;
+      overflow: hidden;
+      font-family: inherit;
+      letter-spacing: -0.02em;
+    }
+    .popup-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      justify-content: flex-start;
+    }
+    .popup-row-db {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .popup-row-db .popup-add-db {
+      width: 100%;
+      margin: 0;
+    }
+    .popup-divider {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--zinc-500);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.5rem 0.375rem 0;
+      margin-top: 0.125rem;
+      border-top: 1px solid rgba(39, 39, 42, 0.8);
+    }
+    .popup button.popup-tab {
+      background: transparent;
+      border: none;
+      color: var(--zinc-400);
+      padding: 0.5rem 0.625rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      min-height: 40px;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .popup button.popup-tab:hover {
+      color: var(--zinc-100);
+      background: rgba(39, 39, 42, 0.5);
+    }
+    .popup button.popup-add-db {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      text-align: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: rgba(52, 211, 153, 1);
+      background: rgba(39, 39, 42, 0.5);
+      border: 1px solid var(--zinc-700);
+      border-radius: 0.375rem;
+      padding: 0.5rem 0.875rem;
+      min-height: 44px;
+      margin: 0.125rem 0 0;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .popup button.popup-add-db:hover {
+      background: rgba(16, 185, 129, 0.1);
+      color: rgba(110, 231, 183, 1);
+      border-color: rgba(63, 63, 70, 0.9);
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app container">
+    <div class="app-header section">
+      <div class="brand-row">
+        <span class="brand">Stefan</span>
+        <span class="brand-badge">LOCAL NODE</span>
+      </div>
+      <p class="tagline">Döljer namn, nummer och känsliga uppgifter innan du klistrar in i AI. Körs lokalt i din webbläsare.</p>
+      <div class="toolbar">
+        <div class="toolbar-pair" role="group" aria-label="Importera text">
+          <button type="button" class="toolbar-btn" id="uploadPdfBtn" title="Välj en PDF-fil från din dator">Ladda upp PDF</button>
+          <button type="button" class="toolbar-btn" id="pasteFromClipboard"
+            title="Klistra in text från urklipp — eller använd Ladda upp PDF / släpp en PDF i fönstret">Klistra in text</button>
+        </div>
+        <input type="file" id="pdfFileInput" class="hidden" accept=".pdf,application/pdf" aria-hidden="true" tabindex="-1" />
+        <span class="toolbar-hint">eller tryck Ctrl+V i rutan nedan</span>
+      </div>
+    </div>
+    <div class="editor-shell section" id="editorDropZone">
+      <div class="editor-frame">
+        <div id="editorDropOverlay" class="editor-drop-overlay" aria-hidden="true">Släpp PDF i fönstret</div>
+        <div id="editor" class="textarea" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Text att anonymisera"></div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <div class="preset-row" role="group" aria-label="Välj promptstil (valfritt)">
+        <button type="button" class="preset-chip" data-preset="summarize" aria-pressed="false">SAMMANFATTA</button>
+        <button type="button" class="preset-chip" data-preset="deadlines" aria-pressed="false">DEADLINES</button>
+        <button type="button" class="preset-chip" data-preset="costs" aria-pressed="false">EKONOMI</button>
+        <button type="button" class="preset-chip" data-preset="custom" aria-pressed="false">EGET VAL</button>
+      </div>
+      <button type="button" id="primary" class="primary hidden" aria-hidden="true"></button>
+      <div class="action-bar-row">
+        <div class="status-wrap">
+          <span class="status-pulse" aria-hidden="true"></span>
+          <div id="status" class="status-text" role="status"></div>
+        </div>
+        <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Börja om</a>
+      </div>
+    </div>
+  </div>
+  <div id="popup" class="popup hidden"></div>
+
+<script>
+"use strict";
+
+/** pdf.js loads from CDN only when the user picks/drops a PDF (avoids blocking paint / flaky CDN). */
+
+/** Paste → hydrate only if core placeholders appear (spec) and a mapping exists. */
+const HYDRATE_DETECT_RE = /\b(PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN)_\d+\b/;
+/** Replace including ITEM_* when hydrating (manual tags / older exports). */
+const HYDRATE_REPLACE_RE = /\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN|ITEM)_\d+\b/g;
+const STORAGE_KEY = "stefan_mapping";
+const CHATGPT_URL = "https://chatgpt.com/";
+/** Invisible anchor so the caret can sit after the last <span> highlight (browser quirk). */
+const EDIT_CARET_ZWSP = "\u200B";
+
+const editor  = document.getElementById("editor");
+const primary = document.getElementById("primary");
+const statusEl = document.getElementById("status");
+const popup   = document.getElementById("popup");
+const clearLink = document.getElementById("clear");
+const pasteFromClipboard = document.getElementById("pasteFromClipboard");
+const uploadPdfBtn = document.getElementById("uploadPdfBtn");
+const pdfFileInput = document.getElementById("pdfFileInput");
+const editorDropZone = document.getElementById("editorDropZone");
+
+let state = {
+  mode: null,            // 'redact' | 'hydrate' | null
+  text: "",              // currently displayed text
+  spans: [],             // [{start,end,type,value}]
+  hydrateRestored: 0,
+  hydrateMissing: 0,
+  /** After Copy & open ChatGPT: editor shows redacted placeholders until next paste or edit. */
+  awaitingReturnPaste: false,
+  /** Preset chip: which Swedish task block to append after redacted text on copy (summarize | deadlines | costs | custom). */
+  selectedPreset: null,
+  /** Set when text was loaded from a PDF (clipboard prompt + status line). */
+  pdfMeta: null,       // null | { fileName: string, pageCount: number }
+};
+
+function syncPresetChipsFromState() {
+  const ids = new Set(
+    [...document.querySelectorAll(".preset-chip")].map((b) => b.dataset.preset).filter(Boolean)
+  );
+  if (state.selectedPreset && !ids.has(state.selectedPreset)) {
+    state.selectedPreset = null;
+  }
+  document.querySelectorAll(".preset-chip").forEach((btn) => {
+    const on = btn.dataset.preset === state.selectedPreset;
+    btn.classList.toggle("preset-chip--selected", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+document.querySelectorAll(".preset-chip").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const id = btn.dataset.preset;
+    if (!id) return;
+    if (state.selectedPreset === id) {
+      state.selectedPreset = null;
+    } else {
+      state.selectedPreset = id;
+    }
+    syncPresetChipsFromState();
+  });
+});
+
+let pendingSelection = null;
+/** Ignore synthetic DOM updates from our own render/splice. */
+let editorSyncing = false;
+let detectTimer = null;
+/** Bumps on each edit/paste so stale detection responses are ignored. */
+let editEpoch = 0;
+let redactDetectInFlight = false;
+/** While detectTimer runs: 'paste' shows Detecting immediately; 'type' keeps status until fetch. */
+let pendingRedactSource = null;
+
+// ----- text helpers ------------------------------------------------------
+
+function normalizeText(t) {
+  return t
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")    // zero-width chars
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map(line => line.replace(/[ \t]+$/, ""))  // trailing whitespace
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");               // collapse blank runs
+}
+
+/** Paste pipeline: base normalize + tweaks so ChatGPT/Word don’t break placeholder tokens. */
+function normalizePastedText(t) {
+  let s = normalizeText(t);
+  s = s.replace(/[\u2018\u2019\u201C\u201D\u00B4]/g, "'");
+  s = s.replace(
+    /`(\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP)_\d+)\b`/g,
+    "$1"
+  );
+  return s;
+}
+
+function sniffContactType(s) {
+  if (s.includes("@")) return "EMAIL";
+  if (/https?:\/\//i.test(s) || /\bwww\./i.test(s)) return "URL";
+  return "PHONE";
+}
+
+function escapeHTML(s) {
+  return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+}
+
+/** Plain text in document order (works with contenteditable + spans). */
+function extractPlainTextFromEditor() {
+  let out = "";
+  const w = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+  let n;
+  while ((n = w.nextNode())) out += n.textContent;
+  return out.replace(/\u200B/g, "");
+}
+
+function getCaretPlainOffset() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)) return null;
+  const range = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(editor);
+  pre.setEnd(range.startContainer, range.startOffset);
+  return pre.toString().length;
+}
+
+function setCaretPlainOffset(offset) {
+  const sel = window.getSelection();
+  const max = offset;
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+  let remain = max;
+  let node;
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length;
+    if (remain <= len) {
+      const r = document.createRange();
+      r.setStart(node, Math.max(0, remain));
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      editor.focus();
+      return;
+    }
+    remain -= len;
+  }
+  const endR = document.createRange();
+  endR.selectNodeContents(editor);
+  endR.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(endR);
+  editor.focus();
+}
+
+function clearDetectTimer() {
+  if (detectTimer) {
+    clearTimeout(detectTimer);
+    detectTimer = null;
+  }
+  pendingRedactSource = null;
+}
+
+function loadMapping() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveMapping(m) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(m));
+}
+
+/** Prepended/appended only to clipboard for ChatGPT — not shown in the editor. */
+const CLIPBOARD_INSTRUCTION_OPEN =
+  "[The following text has been automatically redacted for privacy. Placeholders like PERSON_1, ORG_2, EMAIL_1, LOCATION_1, PHONE_1, SSN_1, URL_1 represent real names, companies, emails, addresses, phone numbers, personal IDs, and URLs. Treat each placeholder as a consistent entity — the same placeholder always refers to the same real value. Respond using the placeholders as-is; they will be automatically restored afterward. Do not ask what the placeholders mean. Format your entire answer for copy-paste: it should look good when pasted into email, Word, Notion, or plain notes — clear section breaks, simple bullet lines, and plain-text-friendly tables (pipes/spaces) where tables are used. No chat-only fluff or decorative framing that would look wrong outside this window.]";
+const CLIPBOARD_INSTRUCTION_CLOSE =
+  "[End of redacted text. Keep all placeholders exactly as written. The reply must be ready to select-all, copy, and paste elsewhere without cleanup.]";
+
+/** When preset SAMMANFATTA is selected — appended after the redacted body (before the English close line). */
+const CLIPBOARD_SUMMARIZE_SV =
+  "Du är en assistent för svenska byggföretag. Sammanfatta följande mejl/dokument i punktform på svenska. Strukturen ska vara:\n\n"
+  + "Huvudbudskap: (1-2 meningar)\n\n"
+  + "Vad som måste göras:\n"
+  + "- [konkreta åtgärder med ansvarig och deadline om angivet]\n\n"
+  + "Viktiga datum & deadlines:\n"
+  + "- [alla datum, möten, frister]\n\n"
+  + "Personer att kontakta:\n"
+  + "- [namn/roll → vad de vill]\n\n"
+  + "Pengar/fakturor som nämns:\n"
+  + "- [belopp och vad det gäller]\n\n"
+  + "Risker eller varningar:\n"
+  + "- [det som kan gå fel om inget görs]\n\n"
+  + "Var konkret. Hoppa över artighetsfraser. Använd platshållarna (PERSON_1, ORG_2 etc) exakt som de står — de återställs automatiskt efteråt. Formatera så att användaren kan kopiera hela svaret och klistra in det i mejl, dokument eller anteckningar utan att behöva fixa radbrytningar eller struktur.";
+
+/** When preset DEADLINES is selected — appended after the redacted body (before the English close line). */
+const CLIPBOARD_DEADLINES_SV =
+  "Du är en assistent för svenska byggföretag. Läs följande text och extrahera ENBART deadlines, datum och tidskritiska saker. Strukturen ska vara:\n\n"
+  + "AKUT (inom 24 timmar):\n"
+  + "- [datum/tid] — [vad som måste göras] — [vem som ansvarar]\n\n"
+  + "DENNA VECKA:\n"
+  + "- [datum] — [vad som måste göras] — [vem som ansvarar]\n\n"
+  + "KOMMANDE:\n"
+  + "- [datum] — [vad som måste göras] — [vem som ansvarar]\n\n"
+  + "Möten:\n"
+  + "- [datum, tid, plats, deltagare]\n\n"
+  + "Lagstadgade frister (GDPR, AI Act, Arbetsmiljöverket, Boverket etc):\n"
+  + "- [vilken lag/myndighet] — [frist] — [konsekvens om missad]\n\n"
+  + "Sortera kronologiskt inom varje kategori. Om en deadline saknas men borde finnas, flagga det med \"Deadline saknas\". Använd platshållarna exakt som de står. Formatera så att listorna och rubrikerna går att kopiera och klistra in någon annanstans med bibehållen läsbarhet.";
+
+/** When preset EKONOMI (costs) is selected — appended after the redacted body (before the English close line). */
+const CLIPBOARD_COSTS_SV =
+  "Du är en ekonomiassistent för svenska byggföretag. Läs följande text och extrahera all ekonomisk information. Strukturen ska vara:\n\n"
+  + "Fakturor att skicka:\n"
+  + "| Mottagare | Belopp (exkl. moms) | Belopp inkl. moms (25%) | Referens | Förfallodag |\n"
+  + "|---|---|---|---|---|\n\n"
+  + "Fakturor att betala:\n"
+  + "| Avsändare | Belopp | Förfallodag | Status |\n"
+  + "|---|---|---|---|\n\n"
+  + "Betalningsuppgifter som nämns:\n"
+  + "- [bankgiro/plusgiro/IBAN/konto + till vem]\n\n"
+  + "Total exponering:\n"
+  + "- Att fakturera ut: [summa] SEK\n"
+  + "- Att betala ut: [summa] SEK\n"
+  + "- Netto: [summa] SEK\n\n"
+  + "Ekonomiska risker:\n"
+  + "- [innehållna betalningar, tvister, ÄTA-arbeten utanför kontrakt, försenade fakturor, kontraktsbrott enligt AB04]\n\n"
+  + "Saknas:\n"
+  + "- [fakturor som borde nämnts men inte är, momsberäkningar, OCR-nummer]\n\n"
+  + "Räkna ut moms (25%) automatiskt om bara nettobelopp anges. Använd platshållarna exakt som de står. Tabeller ska vara enkla texttabeller (pipe-tecken) som klistras in läsbart; hela svaret ska gå att kopiera rakt av till kalkylark, mejl eller dokument.";
+
+/** Clipboard for ChatGPT: privacy note → redacted text → optional Swedish task (preset chip) → closing note. */
+function wrapRedactedForClipboard(redacted) {
+  let body = redacted;
+  if (state.pdfMeta && state.pdfMeta.pageCount) {
+    body =
+      "[Källa: PDF-dokument, " + state.pdfMeta.pageCount + " sidor]\n\n" + body;
+  }
+  let out =
+    CLIPBOARD_INSTRUCTION_OPEN + "\n\n" + body + "\n\n";
+  if (state.selectedPreset === "summarize") {
+    out += CLIPBOARD_SUMMARIZE_SV + "\n\n";
+  } else if (state.selectedPreset === "deadlines") {
+    out += CLIPBOARD_DEADLINES_SV + "\n\n";
+  } else if (state.selectedPreset === "costs") {
+    out += CLIPBOARD_COSTS_SV + "\n\n";
+  }
+  out += CLIPBOARD_INSTRUCTION_CLOSE;
+  return out;
+}
+
+/** Strip echoed AI instruction blocks before hydrating (clipboard wrappers). */
+const HYDRATE_STRIP_LEAD = /^\s*\[[^\]]*(?:redacted|placeholder)[^\]]*\]\s*/i;
+const HYDRATE_STRIP_TAIL = /\s*\[[^\]]*End of redacted[^\]]*\]\s*$/i;
+
+function stripHydrationWrappers(raw) {
+  let t = raw;
+  for (let i = 0; i < 32; i++) {
+    const n = t.replace(HYDRATE_STRIP_LEAD, "");
+    if (n === t) break;
+    t = n;
+  }
+  for (let i = 0; i < 32; i++) {
+    const n = t.replace(HYDRATE_STRIP_TAIL, "");
+    if (n === t) break;
+    t = n;
+  }
+  return t.trim();
+}
+
+// Build placeholder-replaced text + mapping from current state.
+function buildRedacted() {
+  const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+  const counters = {};
+  const valueMap = new Map();
+  const mapping = {};
+  let out = "";
+  let cursor = 0;
+  for (const sp of sorted) {
+    out += state.text.slice(cursor, sp.start);
+    const key = sp.type + "\0" + sp.value;
+    let ph = valueMap.get(key);
+    if (!ph) {
+      counters[sp.type] = (counters[sp.type] || 0) + 1;
+      ph = sp.type + "_" + counters[sp.type];
+      valueMap.set(key, ph);
+      mapping[ph] = sp.value;
+    }
+    out += ph;
+    cursor = sp.end;
+  }
+  out += state.text.slice(cursor);
+  return { redacted: out, mapping };
+}
+
+// ----- rendering ---------------------------------------------------------
+
+function renderEditor() {
+  editorSyncing = true;
+  try {
+    if (!state.text) {
+      editor.textContent = EDIT_CARET_ZWSP;
+      editor.classList.add("editor-placeholder");
+      return;
+    }
+    editor.classList.remove("editor-placeholder");
+    if (state.mode === "hydrate") {
+      editor.textContent = state.text;
+      return;
+    }
+    const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+    const monoTypes = new Set(["EMAIL", "PHONE", "URL", "SSN", "IP", "ORG_NR", "IBAN"]);
+    let html = "";
+    let cursor = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const sp = sorted[i];
+      if (sp.start > cursor) html += escapeHTML(state.text.slice(cursor, sp.start));
+      const monoClass = monoTypes.has(sp.type) ? " mono" : "";
+      html += `<span class="ent redaction${monoClass} ${sp.type}" data-i="${i}">`
+            + escapeHTML(state.text.slice(sp.start, sp.end))
+            + `</span>`;
+      cursor = sp.end;
+    }
+    if (cursor < state.text.length) html += escapeHTML(state.text.slice(cursor));
+    editor.innerHTML = html + EDIT_CARET_ZWSP;
+  } finally {
+    editorSyncing = false;
+  }
+}
+
+function isEmptyState() {
+  return state.mode === null && !state.text;
+}
+
+function updateStatus() {
+  if (isEmptyState()) {
+    primary.className = "primary";
+    primary.classList.add("hidden");
+    primary.setAttribute("aria-hidden", "true");
+    statusEl.textContent = "";
+    clearLink.classList.add("clear--inactive");
+    clearLink.setAttribute("aria-disabled", "true");
+    return;
+  }
+
+  clearLink.classList.remove("clear--inactive");
+  clearLink.setAttribute("aria-disabled", "false");
+
+  if (state.mode === "hydrate") {
+    primary.classList.remove("hidden");
+    primary.setAttribute("aria-hidden", "false");
+    primary.className = "primary primary--success";
+    primary.textContent = "Kopiera återställd text ✓";
+    primary.disabled = false;
+    const r = state.hydrateRestored;
+    statusEl.textContent = r === 1 ? "1 del återställd" : `${r} delar återställda`;
+    return;
+  }
+
+  if (state.mode === "redact") {
+    primary.classList.remove("hidden");
+    primary.setAttribute("aria-hidden", "false");
+    const n = state.spans.length;
+    const waiting = detectTimer !== null;
+    const busy = redactDetectInFlight || waiting;
+
+    if (state.awaitingReturnPaste) {
+      primary.className = "primary primary--wait";
+      primary.textContent = "Klistra in AI-svar här för att återställa ↑";
+      primary.disabled = true;
+      statusEl.textContent = "Kopierat. Väntar på svar från AI …";
+      return;
+    }
+
+    if (busy) {
+      primary.className = "primary primary--busy";
+      primary.textContent = "Jobbar …";
+      primary.disabled = true;
+      statusEl.textContent = "Letar efter känslig text …";
+      return;
+    }
+
+    primary.className = "primary primary--action";
+    primary.textContent = "ChatGPT";
+    primary.disabled = false;
+    if (state.pdfMeta && state.pdfMeta.fileName) {
+      const sid = state.pdfMeta.pageCount === 1 ? "1 sida" : state.pdfMeta.pageCount + " sidor";
+      const hid =
+        n === 1 ? "1 känslig del dold" : n + " känsliga delar dolda";
+      statusEl.textContent =
+        state.pdfMeta.fileName + " — " + sid + ", " + hid;
+    } else {
+      statusEl.textContent = n === 1 ? "1 känslig del dold" : `${n} känsliga delar dolda`;
+    }
+    return;
+  }
+
+  primary.className = "primary";
+  primary.classList.add("hidden");
+  primary.setAttribute("aria-hidden", "true");
+  statusEl.textContent = "";
+}
+
+// ----- detection / paste -------------------------------------------------
+
+const DETECT_TIMEOUT_MS = 120_000;
+
+async function runDetection(text) {
+  const controller = new AbortController();
+  const kill = setTimeout(() => controller.abort(), DETECT_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let msg = await res.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j && j.error) msg = j.error;
+      } catch (_) { /* keep body */ }
+      throw new Error(msg);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error(
+        "Tidsgräns efter 2 min. Prova kortare text, starta om servern "
+        + "och vänta på \"NER model ready\", eller kör: stefan serve --no-spacy"
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(kill);
+  }
+}
+
+function hasUsablePlaceholders(text) {
+  if (!HYDRATE_DETECT_RE.test(text)) return false;
+  const m = loadMapping();
+  return Object.keys(m).length > 0;
+}
+
+function handleHydratePaste(text) {
+  text = stripHydrationWrappers(text);
+  clearDetectTimer();
+  editEpoch++;
+  state.awaitingReturnPaste = false;
+  const mapping = loadMapping();
+  let restored = 0;
+  let missing = 0;
+  const seenMissing = new Set();
+  const result = text.replace(HYDRATE_REPLACE_RE, (ph) => {
+    if (mapping[ph] !== undefined) { restored++; return mapping[ph]; }
+    if (!seenMissing.has(ph)) { seenMissing.add(ph); missing++; }
+    return ph;
+  });
+  state.mode = "hydrate";
+  state.text = result;
+  state.spans = [];
+  state.hydrateRestored = restored;
+  state.hydrateMissing = missing;
+  state.pdfMeta = null;
+  renderEditor();
+  updateStatus();
+}
+
+async function runRedactDetectionForEpoch(epoch) {
+  redactDetectInFlight = true;
+  updateStatus();
+  try {
+    const data = await runDetection(state.text);
+    if (epoch !== editEpoch) return;
+    state.spans = (data.spans || []).map(s => ({
+      start: s.start, end: s.end, type: s.type, value: s.value,
+    }));
+    renderEditor();
+  } catch (e) {
+    if (epoch !== editEpoch) return;
+    statusEl.textContent = "Kunde inte analysera: " + (e.message || e);
+    primary.className = "primary primary--action";
+    primary.textContent = "ChatGPT";
+  } finally {
+    redactDetectInFlight = false;
+    updateStatus();
+  }
+}
+
+const PDFJS_CDN_VER = "3.11.174";
+const PDFJS_CDN_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/" + PDFJS_CDN_VER;
+
+let _pdfJsLoadPromise = null;
+
+/** Load Mozilla pdf.js once (same version as previous blocking tag). */
+function ensurePdfJs() {
+  if (typeof pdfjsLib !== "undefined") {
+    return Promise.resolve();
+  }
+  if (_pdfJsLoadPromise) return _pdfJsLoadPromise;
+  _pdfJsLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = PDFJS_CDN_BASE + "/pdf.min.js";
+    s.crossOrigin = "anonymous";
+    s.async = true;
+    s.onload = function () {
+      if (typeof pdfjsLib === "undefined") {
+        reject(new Error("pdf.js laddades men pdfjsLib saknas."));
+        return;
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_CDN_BASE + "/pdf.worker.min.js";
+      resolve();
+    };
+    s.onerror = function () {
+      reject(new Error("Kunde inte ladda pdf.js (CDN blockerad eller offline)."));
+    };
+    document.head.appendChild(s);
+  });
+  return _pdfJsLoadPromise;
+}
+
+const PDF_WARN_PAGE_COUNT = 50;
+const PDF_SCANNED_MAX_NONWS = 15;
+
+async function extractTextFromPdfArrayBuffer(arrayBuffer) {
+  await ensurePdfJs();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  let pdf;
+  try {
+    pdf = await loadingTask.promise;
+  } catch (e) {
+    if (e && e.name === "PasswordException") {
+      throw new Error("PDF är lösenordsskyddad. Lås upp den först.");
+    }
+    throw new Error("Kunde inte läsa PDF: " + (e && e.message ? e.message : String(e)));
+  }
+  const numPages = pdf.numPages;
+  if (numPages > PDF_WARN_PAGE_COUNT) {
+    statusEl.textContent =
+      "Varning: PDF har " + numPages + " sidor — analysen kan ta lång tid.";
+  }
+  const pageTexts = [];
+  for (let p = 1; p <= numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const line = tc.items.map((it) => (it.str != null ? it.str : "")).join(" ");
+    pageTexts.push(line.trim());
+  }
+  let fullText = pageTexts[0] || "";
+  for (let i = 1; i < pageTexts.length; i++) {
+    fullText += "\n\n--- Sida " + (i + 1) + " ---\n\n" + pageTexts[i];
+  }
+  const collapsed = fullText.replace(/\s/g, "");
+  if (collapsed.length < PDF_SCANNED_MAX_NONWS && numPages >= 1) {
+    throw new Error(
+      "Denna PDF innehåller bara bilder. Stefan kan inte läsa skannade dokument än. Kopiera texten manuellt."
+    );
+  }
+  return { text: fullText, numPages };
+}
+
+function isPdfFile(file) {
+  if (!file || !file.name) return false;
+  const lower = file.name.toLowerCase();
+  return file.type === "application/pdf" || lower.endsWith(".pdf");
+}
+
+function dragTransferHasPdf(dt) {
+  if (!dt) return false;
+  if (dt.types && dt.types.includes("application/pdf")) return true;
+  if (!dt.items || !dt.items.length) return false;
+  for (let i = 0; i < dt.items.length; i++) {
+    const it = dt.items[i];
+    if (it.kind === "file" && it.type === "application/pdf") return true;
+  }
+  return false;
+}
+
+async function processPdfFile(file) {
+  if (!isPdfFile(file)) {
+    statusEl.textContent = "Endast .pdf-filer stöds.";
+    return;
+  }
+  statusEl.textContent = "Läser PDF: " + file.name + " …";
+  let buf;
+  try {
+    buf = await file.arrayBuffer();
+  } catch (e) {
+    statusEl.textContent = "Kunde inte läsa filen: " + (e && e.message ? e.message : String(e));
+    return;
+  }
+  try {
+    const { text, numPages } = await extractTextFromPdfArrayBuffer(buf);
+    if (pdfFileInput) pdfFileInput.value = "";
+    handleRedactPaste(text, {
+      pdfMeta: { fileName: file.name, pageCount: numPages },
+    });
+  } catch (e) {
+    if (pdfFileInput) pdfFileInput.value = "";
+    statusEl.textContent = e.message || String(e);
+    updateStatus();
+  }
+}
+
+/** Paste: show busy UI immediately, debounce 200ms before fetch. */
+function handleRedactPaste(text, opts) {
+  opts = opts || {};
+  editEpoch++;
+  const epoch = editEpoch;
+  clearDetectTimer();
+  state.awaitingReturnPaste = false;
+  state.mode = "redact";
+  state.text = text;
+  state.spans = [];
+  state.hydrateRestored = 0;
+  state.hydrateMissing = 0;
+  state.pdfMeta = opts.pdfMeta != null ? opts.pdfMeta : null;
+  renderEditor();
+  pendingRedactSource = "paste";
+  detectTimer = setTimeout(() => {
+    detectTimer = null;
+    pendingRedactSource = null;
+    runRedactDetectionForEpoch(epoch);
+  }, 200);
+  updateStatus();
+}
+
+function onPaste(e) {
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  const raw = cd.getData("text");
+  if (!raw) return;
+  e.preventDefault();
+  const text = normalizePastedText(raw);
+  const forHydrate = stripHydrationWrappers(text);
+  if (hasUsablePlaceholders(forHydrate)) {
+    handleHydratePaste(forHydrate);
+  } else {
+    handleRedactPaste(text);
+  }
+}
+
+// Catch paste anywhere on the page so the user never needs to focus the editor
+window.addEventListener("paste", onPaste);
+
+if (pasteFromClipboard) {
+  pasteFromClipboard.addEventListener("click", async () => {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      statusEl.textContent = "Webbläsaren tillåter inte knappen här — använd Ctrl+V i rutan.";
+      if (editor) editor.focus();
+      return;
+    }
+    try {
+      const raw = await navigator.clipboard.readText();
+      if (!raw || !String(raw).trim()) {
+        statusEl.textContent = "Urklippet är tomt.";
+        return;
+      }
+      const text = normalizePastedText(raw);
+      const forHydrate = stripHydrationWrappers(text);
+      if (hasUsablePlaceholders(forHydrate)) {
+        handleHydratePaste(forHydrate);
+      } else {
+        handleRedactPaste(text);
+      }
+      if (editor) editor.focus();
+    } catch (e) {
+      statusEl.textContent = "Kunde inte läsa urklipp — prova Ctrl+V.";
+    }
+  });
+}
+
+if (uploadPdfBtn && pdfFileInput) {
+  uploadPdfBtn.addEventListener("click", () => {
+    pdfFileInput.click();
+  });
+}
+
+if (pdfFileInput) {
+  pdfFileInput.addEventListener("change", () => {
+    const f = pdfFileInput.files && pdfFileInput.files[0];
+    if (!f) return;
+    processPdfFile(f);
+  });
+}
+
+function setPdfDragVisual(on) {
+  if (editorDropZone) editorDropZone.classList.toggle("editor-drag-active", on);
+}
+
+/** PDF: släpp var som helst i fönstret (inte bara textrutan). */
+window.addEventListener("dragover", (e) => {
+  if (!dragTransferHasPdf(e.dataTransfer)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  setPdfDragVisual(true);
+});
+
+window.addEventListener("drop", (e) => {
+  setPdfDragVisual(false);
+  if (!dragTransferHasPdf(e.dataTransfer)) return;
+  e.preventDefault();
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || !files.length) return;
+  const f = files[0];
+  if (!isPdfFile(f)) {
+    statusEl.textContent = "Endast .pdf-filer stöds.";
+    return;
+  }
+  processPdfFile(f);
+});
+
+window.addEventListener("dragend", () => {
+  setPdfDragVisual(false);
+});
+
+// Typing and local edits (contenteditable)
+editor.addEventListener("input", () => {
+  if (editorSyncing) return;
+  if (state.mode === "hydrate") {
+    state.text = extractPlainTextFromEditor();
+    updateStatus();
+    return;
+  }
+  editEpoch++;
+  const epoch = editEpoch;
+  clearDetectTimer();
+  state.awaitingReturnPaste = false;
+  const t = extractPlainTextFromEditor();
+  state.text = t;
+  if (!t) {
+    state.mode = null;
+    state.spans = [];
+    state.awaitingReturnPaste = false;
+    state.pdfMeta = null;
+    editorSyncing = true;
+    renderEditor();
+    editorSyncing = false;
+    updateStatus();
+    return;
+  }
+  state.mode = "redact";
+  state.spans = [];
+  const caret = getCaretPlainOffset();
+  editorSyncing = true;
+  editor.innerHTML = escapeHTML(t) + EDIT_CARET_ZWSP;
+  editor.classList.remove("editor-placeholder");
+  editorSyncing = false;
+  if (caret !== null) setCaretPlainOffset(Math.min(caret, t.length));
+  else editor.focus();
+  updateStatus();
+  pendingRedactSource = "type";
+  detectTimer = setTimeout(() => {
+    detectTimer = null;
+    pendingRedactSource = null;
+    if (epoch !== editEpoch) return;
+    runRedactDetectionForEpoch(epoch);
+  }, 450);
+  updateStatus();
+});
+
+// ----- selection-based tagging -------------------------------------------
+
+const TAG_BUTTONS = [
+  { label: "Person",   target: "PERSON" },
+  { label: "Företag",  target: "ORG" },
+  { label: "Plats",    target: "LOCATION" },
+  { label: "Kontakt",  target: "CONTACT" },
+  { label: "Övrigt",   target: "ITEM" },
+];
+
+function buildPopup() {
+  popup.innerHTML = "";
+  const rowTag = document.createElement("div");
+  rowTag.className = "popup-row";
+  for (const b of TAG_BUTTONS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "popup-tab";
+    btn.textContent = b.label;
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault();           // keep selection alive
+      addEntityFromSelection(b.target);
+    });
+    rowTag.appendChild(btn);
+  }
+  const divider = document.createElement("div");
+  divider.className = "popup-divider";
+  divider.textContent = "Spara i ordlista";
+
+  const rowDb = document.createElement("div");
+  rowDb.className = "popup-row popup-row-db";
+  const btnName = document.createElement("button");
+  btnName.type = "button";
+  btnName.className = "popup-add-db";
+  btnName.textContent = "Spara som namn";
+  btnName.title = "Läggs till i data/custom_names.txt (på den här datorn)";
+  btnName.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addSelectionToDictionary("name");
+  });
+  const btnOrg = document.createElement("button");
+  btnOrg.type = "button";
+  btnOrg.className = "popup-add-db";
+  btnOrg.textContent = "Spara som företag";
+  btnOrg.title = "Läggs till i data/construction_orgs.txt (på den här datorn)";
+  btnOrg.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    addSelectionToDictionary("org");
+  });
+  rowDb.appendChild(btnName);
+  rowDb.appendChild(btnOrg);
+
+  popup.appendChild(rowTag);
+  popup.appendChild(divider);
+  popup.appendChild(rowDb);
+}
+buildPopup();
+
+async function addSelectionToDictionary(kind) {
+  if (!pendingSelection) return;
+  const { start, end } = pendingSelection;
+  let s = start, e = end;
+  while (s < e && /\s/.test(state.text[s])) s++;
+  while (e > s && /\s/.test(state.text[e - 1])) e--;
+  if (s === e) {
+    popup.classList.add("hidden");
+    pendingSelection = null;
+    return;
+  }
+  const trimmedValue = state.text.slice(s, e);
+
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  window.getSelection().removeAllRanges();
+
+  try {
+    const res = await fetch("/api/dictionary/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, text: trimmedValue }),
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) { /* ignore */ }
+    if (!res.ok) {
+      statusEl.textContent = "Kunde inte spara: " + (data.error || res.statusText);
+      return;
+    }
+    if (data.duplicate) {
+      statusEl.textContent = "Finns redan i " + (data.file || "listan") + ".";
+    } else {
+      statusEl.textContent = "Sparat i " + (data.file || "listan") + ". Letar igen …";
+    }
+    if (state.mode === "redact" && state.text) {
+      editEpoch++;
+      const epoch = editEpoch;
+      runRedactDetectionForEpoch(epoch);
+    }
+  } catch (err) {
+    statusEl.textContent = "Kunde inte spara: " + (err.message || String(err));
+  }
+}
+
+function getEditorOffsets(range) {
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) {
+    return null;
+  }
+  const before = document.createRange();
+  before.setStart(editor, 0);
+  before.setEnd(range.startContainer, range.startOffset);
+  const start = before.toString().length;
+  const beforeEnd = document.createRange();
+  beforeEnd.setStart(editor, 0);
+  beforeEnd.setEnd(range.endContainer, range.endOffset);
+  const end = beforeEnd.toString().length;
+  if (start === end) return null;
+  return start < end ? { start, end } : { start: end, end: start };
+}
+
+function positionPopupNearRect(rect, clientX, clientY) {
+  popup.classList.remove("hidden");
+  const popupRect = popup.getBoundingClientRect();
+  let left = rect.left + (rect.width - popupRect.width) / 2;
+  let top = rect.top - popupRect.height - 8;
+  if (typeof clientX === "number" && typeof clientY === "number") {
+    left = clientX - popupRect.width / 2;
+    top = clientY - popupRect.height - 8;
+  }
+  const minLeft = 8;
+  const maxLeft = document.documentElement.clientWidth - popupRect.width - 8;
+  if (left < minLeft) left = minLeft;
+  if (left > maxLeft) left = maxLeft;
+  if (top < 4) {
+    top = (typeof clientY === "number" ? clientY : rect.bottom) + 8;
+  }
+  popup.style.left = left + "px";
+  popup.style.top = top + "px";
+}
+
+function showPopupForSelection() {
+  if (state.mode !== "redact" || state.awaitingReturnPaste) {
+    popup.classList.add("hidden");
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    popup.classList.add("hidden");
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  const offsets = getEditorOffsets(range);
+  if (!offsets) {
+    popup.classList.add("hidden");
+    return;
+  }
+  pendingSelection = offsets;
+  const rect = range.getBoundingClientRect();
+  positionPopupNearRect(rect);
+}
+
+editor.addEventListener("contextmenu", (e) => {
+  if (state.mode !== "redact" || state.awaitingReturnPaste) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return;
+  const offsets = getEditorOffsets(range);
+  if (!offsets) return;
+  e.preventDefault();
+  pendingSelection = offsets;
+  const rect = range.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    positionPopupNearRect(rect, e.clientX, e.clientY);
+  });
+});
+
+function addEntityFromSelection(target) {
+  if (!pendingSelection) return;
+  const { start, end } = pendingSelection;
+  const value = state.text.slice(start, end).trim()
+    ? state.text.slice(start, end)
+    : null;
+  if (!value) { popup.classList.add("hidden"); return; }
+
+  // Trim whitespace from the edges of the selection
+  let s = start, e = end;
+  while (s < e && /\s/.test(state.text[s])) s++;
+  while (e > s && /\s/.test(state.text[e - 1])) e--;
+  if (s === e) { popup.classList.add("hidden"); return; }
+  const trimmedValue = state.text.slice(s, e);
+
+  let type = target;
+  if (target === "CONTACT") {
+    type = sniffContactType(trimmedValue);
+  }
+
+  // Drop any existing spans that overlap the new one
+  state.spans = state.spans.filter(sp => !(sp.start < e && s < sp.end));
+  state.spans.push({ start: s, end: e, type, value: trimmedValue });
+  state.spans.sort((a, b) => a.start - b.start);
+  state.awaitingReturnPaste = false;
+
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  window.getSelection().removeAllRanges();
+  renderEditor();
+  updateStatus();
+}
+
+document.addEventListener("mousedown", (e) => {
+  if (popup.contains(e.target)) return;
+  popup.classList.add("hidden");
+});
+
+document.addEventListener("mouseup", (e) => {
+  if (popup.contains(e.target)) return;
+  // Defer so the selection is finalized
+  setTimeout(showPopupForSelection, 0);
+});
+
+// Click an existing highlight to remove it
+editor.addEventListener("click", (e) => {
+  // If user is mid-selection, do not untag
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) return;
+  const target = e.target.closest("span.ent");
+  if (!target) return;
+  const i = parseInt(target.dataset.i, 10);
+  if (Number.isNaN(i)) return;
+  const sorted = [...state.spans].sort((a, b) => a.start - b.start);
+  const sp = sorted[i];
+  if (!sp) return;
+  state.spans = state.spans.filter(x => x !== sp);
+  state.awaitingReturnPaste = false;
+  renderEditor();
+  updateStatus();
+});
+
+// ----- primary action ----------------------------------------------------
+
+primary.addEventListener("click", async () => {
+  if (state.mode === "redact") {
+    if (state.awaitingReturnPaste) return;
+    const { redacted, mapping } = buildRedacted();
+    try {
+      await navigator.clipboard.writeText(wrapRedactedForClipboard(redacted));
+    } catch (e) {
+      statusEl.textContent = "Urklipp blockerat: " + e.message;
+      return;
+    }
+    saveMapping({ ...loadMapping(), ...mapping });
+    state.awaitingReturnPaste = true;
+    editEpoch++;
+    clearDetectTimer();
+    window.open(CHATGPT_URL, "_blank", "noopener");
+    renderEditor();
+    updateStatus();
+  } else if (state.mode === "hydrate") {
+    try {
+      await navigator.clipboard.writeText(state.text);
+      statusEl.textContent = "Kopierat!";
+      setTimeout(() => updateStatus(), 1300);
+    } catch (e) {
+      statusEl.textContent = "Urklipp blockerat: " + e.message;
+    }
+  }
+});
+
+// ----- clear -------------------------------------------------------------
+
+clearLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (clearLink.classList.contains("clear--inactive")) return;
+  clearDetectTimer();
+  editEpoch++;
+  localStorage.removeItem(STORAGE_KEY);
+  state = {
+    mode: null, text: "", spans: [],
+    hydrateRestored: 0, hydrateMissing: 0,
+    awaitingReturnPaste: false,
+    selectedPreset: null,
+    pdfMeta: null,
+  };
+  pendingSelection = null;
+  popup.classList.add("hidden");
+  syncPresetChipsFromState();
+  renderEditor();
+  updateStatus();
+});
+
+// initial paint (ZWSP + placeholder so focus yields a real caret)
+renderEditor();
+updateStatus();
+syncPresetChipsFromState();
+</script>
+</body>
+</html>

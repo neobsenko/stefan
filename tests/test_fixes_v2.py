@@ -1,8 +1,8 @@
 """Regression tests for fixes v2 (all 15 fix areas)."""
 
 import pytest
-from reduct.redactor import redact
-from reduct.detectors.merger import merge_spans
+from stefan.redactor import redact
+from stefan.detectors.merger import merge_spans
 
 
 # --- Fix 1: Hyphenated apostrophe double surnames ---

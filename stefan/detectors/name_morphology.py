@@ -33,7 +33,7 @@ _STOP_PRECEDING = frozenset(
 
 # Polish surname endings (Latin script).
 _POLISH_SUR = re.compile(
-    rf"\b[{_UC}][{_LC}]+(?:ski|ska|cki|cka|wicz|wski|wska|czyk|czak)\b"
+    rf"\b[{_UC}][{_LC}]+(?:ski|ska|cki|cka|ńska|ńcka|dzka|wicz|wski|wska|czyk|czak)\b"
 )
 # East Slavic-style endings (Latin transliteration).
 _SLAVIC_SUR = re.compile(

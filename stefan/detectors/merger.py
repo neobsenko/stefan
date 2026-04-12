@@ -209,6 +209,33 @@ def _merge_adjacent_orgs(
             return spans
 
 
+# Polish company suffix "spółka z o.o." written as "z o.o." after the trade name.
+# No trailing \b after the last dot: "." is non-word, so \b would not match before a space.
+_ORG_ZOO_SUFFIX = re.compile(
+    r"^(?:(?:\s*\.)?\s+)z\s+o\.o\.(?=\s|[,;:.!?\)]|$)", re.IGNORECASE
+)
+
+
+def _extend_org_polish_zoo(
+    spans: List[Tuple[int, int, str, str]],
+    text: str,
+) -> List[Tuple[int, int, str, str]]:
+    """Extend ORG spans to include a following ``z o.o.`` (Polish limited company)."""
+    out: List[Tuple[int, int, str, str]] = []
+    for span in spans:
+        if span[2] != "ORG":
+            out.append(span)
+            continue
+        start, end = span[0], span[1]
+        m = _ORG_ZOO_SUFFIX.match(text[end:])
+        if not m:
+            out.append(span)
+            continue
+        new_end = end + m.end()
+        out.append((start, new_end, "ORG", text[start:new_end]))
+    return out
+
+
 def _merge_non_person(
     spans: List[Tuple[int, int, str, str, int]],
 ) -> List[Tuple[int, int, str, str, int]]:
@@ -318,6 +345,19 @@ def _coreference_person_first_names(
                 continue
             out.append((m_start, m_end, "PERSON", canonical_name))
             occupied.append((m_start, m_end))
+
+        # Swedish possessive/genitive: Anna → Annas, Krzysztof → Krzysztofs (whole word includes "s").
+        if not first.endswith("s") and not first.endswith("S"):
+            gen = f"{first}s"
+            if gen.lower() in stopwords:
+                continue
+            gpat = re.compile(rf"(?<!\w){re.escape(gen)}(?!\w)")
+            for match in gpat.finditer(text):
+                m_start, m_end = match.span()
+                if any(_overlaps((m_start, m_end), iv) for iv in occupied):
+                    continue
+                out.append((m_start, m_end, "PERSON", canonical_name))
+                occupied.append((m_start, m_end))
 
     out.sort(key=lambda s: s[0])
     return out
@@ -453,6 +493,7 @@ def merge_spans(
         result = _merge_adjacent_persons(result, text)
         result = _extend_hyphenated_person_surnames(result, text)
         result = _merge_adjacent_orgs(result, text)
+        result = _extend_org_polish_zoo(result, text)
         result = _coreference_person_first_names(result, text)
 
     return result

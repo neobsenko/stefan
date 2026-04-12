@@ -10,6 +10,9 @@ _ORG_DICTIONARY_FILES = (
     "swedish_org_acronyms.txt",
     "construction_orgs.txt",
     "swedish_insurance_finance.txt",
+    "swedish_law_firms.txt",
+    "staffing_companies.txt",
+    "swedish_municipal_departments.txt",
 )
 
 

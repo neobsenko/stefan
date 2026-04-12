@@ -2,7 +2,7 @@
 
 import pytest
 
-from reduct.detectors.regex import detect_regex
+from stefan.detectors.regex import detect_regex
 
 
 def _types(spans):
@@ -73,6 +73,19 @@ def test_personnummer_twelve_digit_with_dash():
     text = "Registrerad 19720815-4729 här."
     spans = detect_regex(text)
     assert "19720815-4729" in _ssns(spans)
+
+
+def test_personnummer_masked_last_four():
+    text = "PERSON_2 (personnummer: 850512-XXXX) PERSON_3 (personnummer: 910303-XXXX)"
+    spans = detect_regex(text)
+    assert "850512-XXXX" in _ssns(spans)
+    assert "910303-XXXX" in _ssns(spans)
+
+
+def test_personnummer_twelve_digit_masked():
+    text = "ID 19850615-XXXX är maskerat."
+    spans = detect_regex(text)
+    assert "19850615-XXXX" in _ssns(spans)
 
 
 def test_org_nr_org_dot_nr_label():
@@ -295,3 +308,158 @@ def test_swedish_address_hamnplatsen():
     text = "Möte vid Hamnplatsen 3 imorgon."
     spans = detect_regex(text)
     assert "Hamnplatsen 3" in _locs(spans)
+
+
+def test_swedish_address_multiword_street():
+    text = "Besök Mäster Samuelsgatan 20, 111 44 Stockholm."
+    spans = detect_regex(text)
+    locs = _locs(spans)
+    assert any("Mäster Samuelsgatan 20" in loc for loc in locs)
+    assert not any(loc.startswith("Besök") for loc in locs)
+
+
+def test_swedish_address_building_number_range():
+    text = "Kontor Vasagatan 47-49 i stan."
+    spans = detect_regex(text)
+    assert "Vasagatan 47-49" in _locs(spans)
+
+
+def test_swedish_address_kristinas_vag_separate_token():
+    text = "Drottning Kristinas väg 14, 114 51 Stockholm."
+    spans = detect_regex(text)
+    locs = _locs(spans)
+    assert any("Kristinas väg 14" in loc for loc in locs)
+
+
+def test_swedish_apartment_lagenhet_list():
+    text = "i lägenhet 1101, 1102 och 1201 ska särskild"
+    spans = detect_regex(text)
+    assert "lägenhet 1101, 1102 och 1201" in _locs(spans)
+
+
+def test_swedish_apartment_lagenhet_single():
+    text = "Boende i lägenhet 501 har anmält."
+    spans = detect_regex(text)
+    assert "lägenhet 501" in _locs(spans)
+
+
+def test_swedish_apartment_lgh_standalone():
+    text = "Ring innan besök, lgh 12B."
+    spans = detect_regex(text)
+    assert "lgh 12B" in _locs(spans)
+
+
+def test_swedish_apartment_lagenhet_lgh_number():
+    text = "badrummet i lägenhet LGH 1002 (som ägs"
+    spans = detect_regex(text)
+    assert "lägenhet LGH 1002" in _locs(spans)
+
+
+def test_swedish_apartment_hyresgast_i_number():
+    text = "Dessutom har hyresgästen i 1001, en fru"
+    spans = detect_regex(text)
+    assert "hyresgästen i 1001" in _locs(spans)
+
+
+def test_advokatbyran_ampersand_co_org():
+    text = "juridiska ombud på Advokatbyrån Nordquist & Co."
+    spans = detect_regex(text)
+    orgs = _texts(spans, "ORG")
+    assert "Advokatbyrån Nordquist & Co." in orgs
+
+
+def test_polish_sp_zoo_org():
+    text = "underentreprenörer från Budimex z o.o. lämnat"
+    spans = detect_regex(text)
+    assert "Budimex z o.o." in _texts(spans, "ORG")
+
+
+def _vals(spans, kind):
+    return {s[3] for s in spans if s[2] == kind}
+
+
+def test_swedish_bankgiro_patterns():
+    text = "Bankgiro: 891-2746 och 5021-3456."
+    spans = detect_regex(text)
+    assert _vals(spans, "BANKGIRO") == {"891-2746", "5021-3456"}
+
+
+def test_swedish_plusgiro_spaced():
+    text = "Plusgiro: 47 11 47-9"
+    spans = detect_regex(text)
+    assert "47 11 47-9" in _vals(spans, "PLUSGIRO")
+
+
+def test_swedish_bank_account_seb():
+    text = "SEB-konto: 5439-10 123 45 678"
+    spans = detect_regex(text)
+    assert "5439-10 123 45 678" in _vals(spans, "BANK_ACCOUNT")
+
+
+def test_swedish_bank_account_swedbank():
+    text = "Swedbanks konto 8327-9 123 456 789-0"
+    spans = detect_regex(text)
+    assert "8327-9 123 456 789-0" in _vals(spans, "BANK_ACCOUNT")
+
+
+def test_swedish_bank_account_nordea():
+    text = "Nordea 3300 12 3456"
+    spans = detect_regex(text)
+    assert "3300 12 3456" in _vals(spans, "BANK_ACCOUNT")
+
+
+def test_swedish_iban_unchanged():
+    text = "IBAN SE45 5000 0000 0583 9825 7466"
+    spans = detect_regex(text)
+    assert "SE45 5000 0000 0583 9825 7466" in _vals(spans, "IBAN")
+
+
+def test_bank_routing_not_misclassified_as_phone():
+    text = "Ring oss 5439-10 123 45 678 för mer info."
+    spans = detect_regex(text)
+    assert "5439-10 123 45 678" in _vals(spans, "BANK_ACCOUNT")
+    phones = _phones(spans)
+    assert not any("5439" in p or "123 45" in p for p in phones)
+
+
+@pytest.mark.parametrize(
+    "ref_text",
+    [
+        "BL-2026-9999",
+        "RS-2026-04-1847",
+        "F-2026-12",
+        "2026-9999",
+        "Ref: 2026-04-1847",
+    ],
+)
+def test_reference_ids_not_tagged_as_bank_routing(ref_text):
+    spans = detect_regex(ref_text)
+    assert _vals(spans, "BANK_ACCOUNT") == set()
+    assert _vals(spans, "BANKGIRO") == set()
+    assert _vals(spans, "PLUSGIRO") == set()
+
+
+def test_combined_swedish_payment_routing_redact():
+    """End-to-end: bank routing numbers become placeholders, not plain text."""
+    from stefan.redactor import redact
+
+    text = (
+        "Bankgiro: 891-2746 och Bankgiro: 5021-3456. "
+        "Plusgiro: 47 11 47-9. "
+        "SEB-konto: 5439-10 123 45 678. "
+        "Swedbanks konto 8327-9 123 456 789-0. "
+        "Nordea 3300 12 3456. "
+        "IBAN SE45 5000 0000 0583 9825 7466."
+    )
+    redacted, mapping = redact(text, use_spacy=False)
+    for secret in (
+        "891-2746",
+        "5021-3456",
+        "47 11 47-9",
+        "5439-10 123 45 678",
+        "8327-9 123 456 789-0",
+        "3300 12 3456",
+        "SE45 5000 0000 0583 9825 7466",
+    ):
+        assert secret not in redacted
+        assert secret in mapping.values()

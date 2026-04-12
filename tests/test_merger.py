@@ -1,7 +1,7 @@
 """Tests for span merging and priority resolution."""
 
-from reduct.detectors.merger import merge_spans
-from reduct.redactor import redact
+from stefan.detectors.merger import merge_spans
+from stefan.redactor import redact
 
 
 def test_no_overlap_keeps_all():
@@ -10,6 +10,35 @@ def test_no_overlap_keeps_all():
     spacy = [(20, 25, "ORG", "Volvo")]
     merged = merge_spans(regex, dict_, spacy)
     assert len(merged) == 3
+
+
+def test_org_extends_polish_z_o_o_suffix():
+    text = "underentreprenörer från Budimex z o.o. lämnat"
+    # "Budimex" only from upstream detector; merger extends through z o.o.
+    start = text.index("Budimex")
+    end = start + len("Budimex")
+    merged = merge_spans([(start, end, "ORG", "Budimex")], [], [], text=text)
+    orgs = [m for m in merged if m[2] == "ORG"]
+    assert len(orgs) == 1
+    assert orgs[0][3] == "Budimex z o.o."
+
+
+def test_advokatbyran_org_beats_overlapping_person():
+    text = "ombud på Advokatbyrån Nordquist & Co. imorgon"
+    org_start = text.index("Advokatbyrån")
+    org_end = text.index("Co.") + len("Co.")
+    person_start = text.index("Nordquist")
+    person_end = person_start + len("Nordquist")
+    merged = merge_spans(
+        [(org_start, org_end, "ORG", text[org_start:org_end])],
+        [(person_start, person_end, "PERSON", "Nordquist")],
+        [],
+        text=text,
+    )
+    assert (person_start, person_end, "PERSON", "Nordquist") not in merged
+    org_hit = [m for m in merged if m[2] == "ORG"]
+    assert len(org_hit) == 1
+    assert "Nordquist" in org_hit[0][3]
 
 
 def test_regex_beats_dictionary_on_overlap():
@@ -223,6 +252,29 @@ def test_coreference_links_capitalized_hans_to_full_name():
     assert len(person_keys) == 1
     assert mapping[person_keys[0]] == "Hans van der Berg"
     assert redacted.count(person_keys[0]) == 2
+
+
+def test_coreference_swedish_genitive_first_name():
+    text = "Krzysztof Wójcik-Nowak ringde. Vi nämnde Krzysztofs olycka."
+    redacted, mapping = redact(text, use_spacy=False)
+    person_keys = [k for k in mapping if k.startswith("PERSON_")]
+    assert len(person_keys) == 1
+    assert mapping[person_keys[0]] == "Krzysztof Wójcik-Nowak"
+    assert redacted.count(person_keys[0]) == 2
+
+
+def test_bas_u_not_split_into_person_baseline():
+    text = "Andrzej Kaczmarczyk (BAS-U-ansvarig) rapporterade."
+    redacted, mapping = redact(text, use_spacy=False)
+    assert "BAS-U-ansvarig" in redacted
+    assert "BAS" not in mapping.values()
+
+
+def test_halla_verb_not_tagged_as_person():
+    text = "1) Hålla inne betalning enligt AB04 kap 6."
+    redacted, mapping = redact(text, use_spacy=False)
+    assert "Hålla" in redacted
+    assert "Hålla" not in mapping.values()
 
 
 def test_org_span_wins_over_nested_location_for_stockholm_name():

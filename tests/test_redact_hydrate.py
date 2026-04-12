@@ -2,8 +2,8 @@
 
 import re
 
-from reduct.hydrator import hydrate
-from reduct.redactor import redact
+from stefan.hydrator import hydrate
+from stefan.redactor import redact
 
 
 def test_basic_redact_returns_mapping():

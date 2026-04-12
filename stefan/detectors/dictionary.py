@@ -48,6 +48,23 @@ def _load_names() -> Set[str]:
 # Unicode word tokens (covers Polish, Nordic, etc.).
 _WORD_RE = re.compile(r"\b\w+\b", re.UNICODE)
 
+# Hyphenated compounds split into separate \w tokens; protect known abbreviations
+# so sub-tokens (e.g. BAS from BAS-U) are not tagged as PERSON.
+_PROTECTED_COMPOUND_RE = re.compile(
+    r"\b(?:BAS-U|BAS-P|BASU|BASP|ID-06|F-skatt|F-skattebevis|"
+    r"A-traktor|B-körkort|C-körkort|D-körkort|E-handel|E-faktura|E-post|"
+    r"A-kassa|P-plats|P-hus|T-bana|T-shirt)\b",
+    re.IGNORECASE,
+)
+
+
+def _protected_compound_spans(text: str) -> List[Tuple[int, int]]:
+    return [(m.start(), m.end()) for m in _PROTECTED_COMPOUND_RE.finditer(text)]
+
+
+def _overlaps_any(start: int, end: int, ranges: List[Tuple[int, int]]) -> bool:
+    return any(start < pe and end > ps for ps, pe in ranges)
+
 
 def detect_dictionary(text: str) -> List[Tuple[int, int, str, str]]:
     """Find known personal names in text.
@@ -56,9 +73,13 @@ def detect_dictionary(text: str) -> List[Tuple[int, int, str, str]]:
     Whole-token matching, case-insensitive.
     """
     names = _load_names()
+    protected = _protected_compound_spans(text)
     spans: List[Tuple[int, int, str, str]] = []
     tokens = list(_WORD_RE.finditer(text))
     for i, match in enumerate(tokens):
+        w0, w1 = match.start(), match.end()
+        if protected and _overlaps_any(w0, w1, protected):
+            continue
         word = match.group(0)
         if not any(c.isalpha() for c in word):
             continue

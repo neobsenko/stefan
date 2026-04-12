@@ -11,11 +11,11 @@ from html import escape
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, make_response, redirect, request
 
 app = Flask(__name__)
-# Regex + dictionary only (no spaCy). Set via `stefan serve --no-spacy` or REDUCT_WEB_NO_SPACY=1.
-app.config.setdefault("REDUCT_USE_SPACY", True)
+# Regex + dictionary only (no spaCy). Set via `stefan serve --no-spacy` or STEFAN_WEB_NO_SPACY=1.
+app.config.setdefault("STEFAN_USE_SPACY", True)
 
 _DEFAULT_MAX_DETECT_CHARS = 100_000
 # New value each process start — used to tell the browser when the dev server restarted.
@@ -25,20 +25,32 @@ SERVER_BOOT_ID = os.urandom(8).hex()
 _STATIC_INDEX = Path(__file__).resolve().parent / "static" / "index.html"
 _CUSTOM_NAMES_PATH = Path(__file__).resolve().parent / "data" / "custom_names.txt"
 _CONSTRUCTION_ORGS_PATH = Path(__file__).resolve().parent / "data" / "construction_orgs.txt"
-_index_html_cache: Optional[str] = None
+_index_html_mtime: Optional[float] = None
+_index_html_cached: Optional[str] = None
 
 _MAX_DICTIONARY_LINE_LEN = 500
 
 
 def _base_index_html() -> str:
-    global _index_html_cache
-    if _index_html_cache is None:
+    """Load UI shell; reload from disk when ``index.html`` changes (mtime).
+
+    A one-shot cache survives edits until process exit — confusing when only
+    ``static/index.html`` changes. Browsers also cache ``GET /`` unless we send
+    ``Cache-Control: no-store`` (see ``index()``).
+    """
+    global _index_html_mtime, _index_html_cached
+    try:
+        mtime = _STATIC_INDEX.stat().st_mtime
+    except OSError:
+        mtime = -1.0
+    if _index_html_cached is None or _index_html_mtime != mtime:
         raw = _STATIC_INDEX.read_text(encoding="utf-8")
         end = raw.find("</html>")
         if end != -1:
             raw = raw[: end + len("</html>")]
-        _index_html_cache = raw
-    return _index_html_cache
+        _index_html_cached = raw
+        _index_html_mtime = mtime
+    return _index_html_cached
 
 
 # Injected before </body> when reload is enabled so the tab picks up new HTML/JS after a restart.
@@ -63,14 +75,17 @@ _LIVERELOAD_SNIPPET = """
 
 def _index_html_response():
     html = _base_index_html()
-    if app.config.get("REDUCT_BROWSER_REFRESH"):
+    if app.config.get("STEFAN_BROWSER_REFRESH"):
         html = html.replace("</body>", _LIVERELOAD_SNIPPET + "\n</body>", 1)
     return html
 
 
 @app.route("/")
 def index():
-    return _index_html_response()
+    html = _index_html_response()
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "no-store, max-age=0, must-revalidate"
+    return resp
 
 
 @app.route("/api/_stefan/boot")
@@ -82,7 +97,7 @@ def api_stefan_boot():
 @app.route("/admin/custom-names", methods=["GET", "POST"])
 def admin_custom_names():
     """Append names to ``data/custom_names.txt`` and reload dictionaries (local / trusted use)."""
-    from reduct.detectors.dictionary import reload_name_dictionaries
+    from stefan.detectors.dictionary import reload_name_dictionaries
 
     if request.method == "POST":
         raw = request.form.get("names", "") or ""
@@ -122,8 +137,8 @@ def admin_custom_names():
 @app.route("/api/dictionary/add", methods=["POST"])
 def api_dictionary_add():
     """Append a line to local name or org dictionary (JSON API for the web UI)."""
-    from reduct.detectors.dictionary import reload_name_dictionaries
-    from reduct.detectors.dictionary_orgs import reload_org_dictionaries
+    from stefan.detectors.dictionary import reload_name_dictionaries
+    from stefan.detectors.dictionary_orgs import reload_org_dictionaries
 
     payload = request.get_json(silent=True) or {}
     kind = payload.get("kind")
@@ -172,7 +187,7 @@ def api_dictionary_add():
 
 
 def _max_detect_chars() -> int:
-    raw = os.environ.get("REDUCT_MAX_DETECT_CHARS", str(_DEFAULT_MAX_DETECT_CHARS))
+    raw = os.environ.get("STEFAN_MAX_DETECT_CHARS", str(_DEFAULT_MAX_DETECT_CHARS))
     try:
         n = int(raw)
     except ValueError:
@@ -182,15 +197,15 @@ def _max_detect_chars() -> int:
 
 @app.route("/api/detect", methods=["POST"])
 def api_detect():
-    from reduct.detectors import (
+    from stefan.detectors import (
         detect_dictionary,
         detect_dictionary_orgs,
         detect_regex,
         detect_spacy,
         merge_spans,
     )
-    from reduct.detectors.context_triggers import detect_context_triggers
-    from reduct.detectors.name_morphology import detect_name_morphology
+    from stefan.detectors.context_triggers import detect_context_triggers
+    from stefan.detectors.name_morphology import detect_name_morphology
 
     payload = request.get_json(silent=True) or {}
     text = payload.get("text", "")
@@ -203,7 +218,7 @@ def api_detect():
             jsonify(
                 {
                     "error": f"text too long ({len(text)} chars; max {limit}). "
-                    "Paste a smaller chunk or raise REDUCT_MAX_DETECT_CHARS."
+                    "Paste a smaller chunk or raise STEFAN_MAX_DETECT_CHARS."
                 }
             ),
             413,
@@ -216,7 +231,7 @@ def api_detect():
         + detect_name_morphology(text)
     )
     spacy_spans = []
-    if app.config.get("REDUCT_USE_SPACY", True):
+    if app.config.get("STEFAN_USE_SPACY", True):
         try:
             spacy_spans = detect_spacy(text)
         except RuntimeError:
@@ -241,7 +256,7 @@ def _warm_spacy_model(quiet: bool, use_spacy: bool) -> None:
             file=sys.stderr,
             flush=True,
         )
-    from reduct.detectors.nlp import warm_model_for_web
+    from stefan.detectors.nlp import warm_model_for_web
 
     if warm_model_for_web(quiet=quiet):
         if not quiet:
@@ -269,9 +284,9 @@ def run(
     and the UI polls ``/api/_stefan/boot`` so open tabs refresh (slower startup
     than default). ``--debug`` alone does not enable the reloader.
     """
-    if os.environ.get("REDUCT_WEB_NO_SPACY", "").strip().lower() in ("1", "true", "yes"):
+    if os.environ.get("STEFAN_WEB_NO_SPACY", "").strip().lower() in ("1", "true", "yes"):
         use_spacy = False
-    app.config["REDUCT_USE_SPACY"] = bool(use_spacy)
+    app.config["STEFAN_USE_SPACY"] = bool(use_spacy)
 
     if quiet:
         import logging
@@ -281,7 +296,10 @@ def run(
 
     _warm_spacy_model(quiet=quiet, use_spacy=bool(use_spacy))
 
-    app.config["REDUCT_BROWSER_REFRESH"] = bool(reload) or bool(debug)
+    if not quiet:
+        print(f"Web UI HTML (must contain your edits): {_STATIC_INDEX}", file=sys.stderr, flush=True)
+
+    app.config["STEFAN_BROWSER_REFRESH"] = bool(reload) or bool(debug)
     # Only `--reload` uses the stat reloader (extra process + slow startup). `--debug` alone
     # keeps the interactive debugger without paying reloader cost.
     use_reloader = bool(reload)

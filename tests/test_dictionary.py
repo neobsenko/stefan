@@ -1,6 +1,6 @@
 """Tests for dictionary-based name detection."""
 
-from reduct.detectors.dictionary import detect_dictionary
+from stefan.detectors.dictionary import detect_dictionary, reload_name_dictionaries
 
 
 def _texts(spans):
@@ -61,3 +61,12 @@ def test_all_returned_spans_are_person_type():
     spans = detect_dictionary(text)
     assert all(s[2] == "PERSON" for s in spans)
     assert len(spans) >= 2
+
+
+def test_polish_names_loaded():
+    reload_name_dictionaries()
+    text = "Magdalena Nowak ringde."
+    spans = detect_dictionary(text)
+    found = _texts(spans)
+    assert "Magdalena" in found
+    assert "Nowak" in found

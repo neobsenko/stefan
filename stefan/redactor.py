@@ -2,15 +2,15 @@
 
 from typing import Dict, List, Tuple
 
-from reduct.detectors import (
+from stefan.detectors import (
     detect_dictionary,
     detect_dictionary_orgs,
     detect_regex,
     detect_spacy,
     merge_spans,
 )
-from reduct.detectors.context_triggers import detect_context_triggers
-from reduct.detectors.name_morphology import detect_name_morphology
+from stefan.detectors.context_triggers import detect_context_triggers
+from stefan.detectors.name_morphology import detect_name_morphology
 
 
 def redact(text: str, use_spacy: bool = True) -> Tuple[str, Dict[str, str]]:

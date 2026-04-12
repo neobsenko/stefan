@@ -40,7 +40,7 @@ def cli():
               help="Path to write the placeholder mapping JSON.")
 def redact_cmd(input_path, output_path, map_path):
     """Detect sensitive entities and replace them with placeholders."""
-    from reduct.redactor import redact
+    from stefan.redactor import redact
 
     text = _read_input(input_path)
     redacted, mapping = redact(text)
@@ -76,7 +76,7 @@ def redact_cmd(input_path, output_path, map_path):
 def serve_cmd(host, port, debug, reload, quiet, no_spacy):
     """Start the local web UI (use http://stefan.local after hosts setup)."""
     try:
-        from reduct.web import run
+        from stefan.web import run
     except ImportError as e:
         raise click.ClickException(
             "Flask is required for 'stefan serve'. Install with: pip install flask"
@@ -118,8 +118,8 @@ def serve_cmd(host, port, debug, reload, quiet, no_spacy):
         if not no_spacy:
             click.echo(
                 "The UI loads a Swedish spaCy model once (see terminal): prefers "
-                "sv_core_news_sm, else sv_core_news_lg. Max accuracy: set "
-                "REDUCT_SPACY_MODEL=sv_core_news_lg. Regex-only (no ML): --no-spacy."
+                "sv_core_news_sm, else sv_core_news_md. For maximum accuracy (slower, larger): "
+                "STEFAN_SPACY_MODEL=sv_core_news_lg. Regex-only (no ML): --no-spacy."
             )
             click.echo("")
 
@@ -143,7 +143,7 @@ def serve_cmd(host, port, debug, reload, quiet, no_spacy):
               help="Path to read the placeholder mapping JSON.")
 def hydrate_cmd(input_path, output_path, map_path):
     """Replace placeholders with their original values from the mapping."""
-    from reduct.hydrator import hydrate
+    from stefan.hydrator import hydrate
 
     text = _read_input(input_path)
     mapping = json.loads(Path(map_path).read_text(encoding="utf-8"))

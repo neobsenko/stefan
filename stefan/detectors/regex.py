@@ -21,10 +21,21 @@ _ORG_SUFFIX = (
     r"AB|AS|HB|KB|KG)"
 )
 
-# Street name endings (Swedish).
+# Street name endings (Swedish) — suffix glued to the last word (e.g. Samuelsgatan).
+# Separate "… väg" (two tokens) is handled by a second LOCATION pattern below.
 _STREET_SUFFIX = (
     r"(?:vägen|gränden|gränd|gatan|torget|stigen|leden|platsen|backen|allén|kajen|bron)"
 )
+_STREET_TOKEN = rf"[A-ZÅÄÖ][{_ORG_LC}\-]*"
+_STREET_OCCUPANCY = r"\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?"
+
+# Swedish payment routing: must not match reference IDs (BL-2026-…, RS-…, year-prefixed, etc.).
+# Left context = line start or a separator (so not glued to letter-hyphen refs like "BL-2026-…").
+_BANK_ROUTE_LEFT = r"(?:^|(?<=[,\s\n\r:;]))"
+# Not immediately after single-letter + hyphen (BL-, F-, X- …); blocks ref codes like "RS-2026-…".
+_BANK_ROUTE_NOT_AFTER_LETTER_HYPH = r"(?<![A-Za-zÀ-Öà-ö]-)"
+# Not a calendar-year–prefixed reference segment (2026-, 2025-, …).
+_BANK_ROUTE_NOT_YEAR = r"(?!20\d{2}-)"
 
 # (entity_type, compiled_pattern, capture_group_index)
 PATTERNS: List[Tuple[str, re.Pattern, int]] = [
@@ -41,6 +52,73 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         "IBAN",
         re.compile(
             r"\b[A-Z]{2}\d{2}(?:[ \t]?[A-Z0-9]{4}){2,7}[ \t]?[A-Z0-9]{1,4}\b"
+        ),
+        0,
+    ),
+    # Swedish Bankgiro (3–4 digits, hyphen, 4 digits) — before PHONE.
+    # Exclude year-shaped refs (2026-9999); require separator/line-start (not BL-2026-…).
+    (
+        "BANKGIRO",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + _BANK_ROUTE_NOT_YEAR
+            + r"\d{3,4}-\d{4}\b"
+        ),
+        0,
+    ),
+    # Plusgiro: spaced groups (e.g. 47 11 47-9).
+    (
+        "PLUSGIRO",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + r"\d{2}\s\d{2}\s\d{2}-\d\b"
+        ),
+        0,
+    ),
+    # Plusgiro: compact (ends with single check digit after hyphen).
+    (
+        "PLUSGIRO",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + _BANK_ROUTE_NOT_YEAR
+            + r"\d{1,8}-\d\b"
+        ),
+        0,
+    ),
+    # Swedish bank account — SEB-style clearing + account groups.
+    (
+        "BANK_ACCOUNT",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + _BANK_ROUTE_NOT_YEAR
+            + r"\d{4}-\d{2}\s\d{3}\s\d{2}\s\d{3}\b"
+        ),
+        0,
+    ),
+    # Nordea-style and similar short grouped formats.
+    (
+        "BANK_ACCOUNT",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + r"(?!20\d{2})\d{4}\s\d{2}\s\d{4}\b"
+        ),
+        0,
+    ),
+    # General Swedish account (Swedbank, Handelsbanken, etc.).
+    # Reject leading 00… so international dial prefixes (0046 …) are not bank accounts.
+    # Reject year-prefixed refs (2026-04-1847). May match a suffix of an IBAN; merge keeps IBAN.
+    (
+        "BANK_ACCOUNT",
+        re.compile(
+            _BANK_ROUTE_LEFT
+            + _BANK_ROUTE_NOT_AFTER_LETTER_HYPH
+            + _BANK_ROUTE_NOT_YEAR
+            + r"(?!00)\d{4,5}[-\s,]\d{1,3}[\s\d\-]{5,18}\b"
         ),
         0,
     ),
@@ -101,12 +179,13 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         1,
     ),
     # Swedish personnummer — dash required (no bare digit runs).
+    # Last four may be digits or a standard mask (XXXX / xxxx / ****).
     (
         "SSN",
         re.compile(
             r"\b(?:"
-            r"(?:19|20)\d{6}-\d{4}"
-            r"|\d{6}-\d{4}"
+            r"(?:19|20)\d{6}-(?:\d{4}|[Xx\*]{4})"
+            r"|\d{6}-(?:\d{4}|[Xx\*]{4})"
             r")\b"
         ),
         0,
@@ -177,14 +256,52 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         ),
         0,
     ),
+    # Advokatfirman + name (major law firms; complements dictionary list).
+    (
+        "ORG",
+        re.compile(
+            rf"\bAdvokatfirman\s+[{_ORG_UC}][{_ORG_LC}]+\b"
+        ),
+        0,
+    ),
+    # Advokatbyrån Name & Co. — full firm (avoids PERSON on the partner name alone).
+    # No trailing \b after Co.: "." is non-word, so \b would not end the match at "Co.".
+    (
+        "ORG",
+        re.compile(
+            rf"(?i)\bAdvokatbyrån\s+(?:{_ORG_BODY_TOKEN}\s+){{1,3}}&\s+Co\.?(?=\s|[,.;:!?\)]|$)"
+        ),
+        0,
+    ),
+    # Polish sp. z o.o. after a company-style token (common in Swedish subcontractor lists).
+    (
+        "ORG",
+        re.compile(
+            rf"(?i)\b{_ORG_BODY_TOKEN}\s+z\s+o\.o\.(?=\s|[,.;:!?\)]|$)"
+        ),
+        0,
+    ),
     # Swedish street address with optional apartment (lgh) and postal code + city.
     (
         "LOCATION",
         re.compile(
             r"\b"
-            rf"[A-ZÅÄÖ][{_ORG_LC}\-]*"
+            + rf"(?:{_STREET_TOKEN}\s+){{0,2}}"
+            + rf"{_STREET_TOKEN}"
             + _STREET_SUFFIX
-            + r"\s+\d+[A-Za-z]?"
+            + rf"\s+{_STREET_OCCUPANCY}"
+            + r"(?:,?\s*lgh\.?\s+\d+)?"
+            + r"(?:,?\s*\d{3}\s+\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
+            + r"\b"
+        ),
+        0,
+    ),
+    # e.g. "Drottning Kristinas väg 14" — väg as its own token.
+    (
+        "LOCATION",
+        re.compile(
+            r"\b"
+            + rf"(?:{_STREET_TOKEN}\s+){{1,3}}[Vv]äg\s+{_STREET_OCCUPANCY}"
             + r"(?:,?\s*lgh\.?\s+\d+)?"
             + r"(?:,?\s*\d{3}\s+\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
             + r"\b"
@@ -200,7 +317,81 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         ),
         0,
     ),
+    # Apartment / unit: lägenhet 1101, lägenhet LGH 1002, or lägenhet 1101, 1102 och 1201.
+    (
+        "LOCATION",
+        re.compile(
+            r"(?i)\blägenhet(?:en)?\s+"
+            r"(?:lgh\.?\s+)?"
+            r"(?:\d{1,4}[A-Za-z]?(?:\s*,\s*\d{1,4}[A-Za-z]?)*(?:\s+och\s+\d{1,4}[A-Za-z]?)?)"
+            r"\b"
+        ),
+        0,
+    ),
+    # Hyresgäst i 1001 — apartment number without the word lägenhet.
+    (
+        "LOCATION",
+        re.compile(r"(?i)\bhyresgäs(?:ten|t)\s+i\s+\d{1,4}\b"),
+        0,
+    ),
+    # Standalone lgh (not only after a full street line).
+    (
+        "LOCATION",
+        re.compile(r"(?i)\blgh\.?\s+\d{1,4}[A-Za-z]?\b"),
+        0,
+    ),
 ]
+
+# First word of a LOCATION match is sometimes prose (e.g. "Besök Mäster Samuelsgatan …")
+# before the actual street; strip these while a house number remains.
+def _intervals_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
+    return a0 < b1 and b0 < a1
+
+
+_LOCATION_LEADING_TRASH = frozenset(
+    {
+        "besök",
+        "ring",
+        "skicka",
+        "kontakta",
+        "boka",
+        "kom",
+        "gå",
+        "komma",
+        "möt",
+        "se",
+        "fråga",
+        "hitta",
+        "passa",
+        "titta",
+        "kontor",
+        "adress",
+        "leverans",
+    }
+)
+
+
+def _trim_location_leading_prose(text: str, start: int, end: int) -> Tuple[int, int]:
+    """Drop leading capitalized sentence words before multi-word street matches."""
+    new_start = start
+    while new_start < end:
+        seg = text[new_start:end]
+        parts = seg.split()
+        if len(parts) < 3:
+            break
+        first = parts[0].lower().rstrip(".,;:!?")
+        if first not in _LOCATION_LEADING_TRASH:
+            break
+        m = re.match(r"^\S+\s+", text[new_start:end])
+        if not m:
+            break
+        new_start += m.end()
+    if new_start == start:
+        return start, end
+    rest = text[new_start:end]
+    if len(rest.split()) < 2 or not any(c.isdigit() for c in rest):
+        return start, end
+    return new_start, end
 
 
 def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
@@ -227,12 +418,29 @@ def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
                     continue
             spans.append((start, end, entity_type, matched))
 
-    # IBANs must never be misclassified as PHONE.
-    iban_spans = {(s, e) for s, e, t, _ in spans if t == "IBAN"}
+    adjusted: List[Tuple[int, int, str, str]] = []
+    for start, end, entity_type, matched in spans:
+        if entity_type != "LOCATION":
+            adjusted.append((start, end, entity_type, matched))
+            continue
+        ns, ne = _trim_location_leading_prose(text, start, end)
+        adjusted.append((ns, ne, entity_type, text[ns:ne]))
+    spans = adjusted
+
+    # IBAN and Swedish payment routing numbers must never be misclassified as PHONE.
+    _PROTECT_PHONE = frozenset({"IBAN", "BANKGIRO", "PLUSGIRO", "BANK_ACCOUNT"})
+    protected_spans = {(s, e) for s, e, t, _ in spans if t in _PROTECT_PHONE}
+
     spans = [
         sp
         for sp in spans
-        if not (sp[2] == "PHONE" and any(sp[0] >= i0 and sp[1] <= i1 for i0, i1 in iban_spans))
+        if not (
+            sp[2] == "PHONE"
+            and any(
+                _intervals_overlap(sp[0], sp[1], i0, i1)
+                for i0, i1 in protected_spans
+            )
+        )
     ]
 
     # Same digit span can match ORG_NR (labeled) and SSN (\d{6}-\d{4}); keep ORG_NR only.

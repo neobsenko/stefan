@@ -5,8 +5,8 @@ import sys
 from functools import lru_cache
 from typing import List, Optional, Tuple
 
-# Web UI tries these in order when REDUCT_SPACY_MODEL is unset (fast sm, then accurate lg).
-_WEB_SERVE_MODEL_ORDER = ("sv_core_news_sm", "sv_core_news_lg")
+# Web UI tries these in order when STEFAN_SPACY_MODEL is unset (fast sm, then md).
+_WEB_SERVE_MODEL_ORDER = ("sv_core_news_sm", "sv_core_news_md")
 
 # spaCy entity label -> our type
 _LABEL_MAP = {
@@ -17,12 +17,12 @@ _LABEL_MAP = {
     "GPE": "LOCATION",
 }
 
-# Override with e.g. REDUCT_SPACY_MODEL=sv_core_news_sm for much faster (slightly less accurate) NER.
-_DEFAULT_MODEL = "sv_core_news_lg"
+# Override with e.g. STEFAN_SPACY_MODEL=sv_core_news_sm for much faster (slightly less accurate) NER.
+_DEFAULT_MODEL = "sv_core_news_md"
 
 
 def _model_name() -> str:
-    return os.environ.get("REDUCT_SPACY_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
+    return os.environ.get("STEFAN_SPACY_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
 
 
 @lru_cache(maxsize=1)
@@ -49,8 +49,8 @@ def _load_model():
 
 
 def warm_model_for_web(*, quiet: bool = False) -> bool:
-    """Load spaCy for ``stefan serve``: prefer small model, fall back to lg. Returns True if loaded."""
-    if os.environ.get("REDUCT_SPACY_MODEL", "").strip():
+    """Load spaCy for ``stefan serve``: prefer small model, fall back to md. Returns True if loaded."""
+    if os.environ.get("STEFAN_SPACY_MODEL", "").strip():
         try:
             _load_model()
             if not quiet:
@@ -67,7 +67,7 @@ def warm_model_for_web(*, quiet: bool = False) -> bool:
 
     last_err: Optional[Exception] = None
     for name in _WEB_SERVE_MODEL_ORDER:
-        os.environ["REDUCT_SPACY_MODEL"] = name
+        os.environ["STEFAN_SPACY_MODEL"] = name
         _load_model.cache_clear()
         try:
             _load_model()

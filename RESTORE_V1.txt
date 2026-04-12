@@ -4,7 +4,7 @@ En git-tagg "v1" pekar på kodbasen som den var när checkpointen skapades
 (innan senaste UI-förbättringar). Allt som committats efter den första v1-commiten
 kan du kasta och gå tillbaka så här:
 
-  cd c:\reductlegal
+  cd c:\stefan
   git reset --hard v1
 
 Varning: Alla osparade ändringar i spårade filer försvinner. Spara eller kopiera

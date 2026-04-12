@@ -1,6 +1,6 @@
 """Critical regression tests from latest QA report."""
 
-from reduct.redactor import redact
+from stefan.redactor import redact
 
 
 def _values_by_prefix(mapping: dict[str, str], prefix: str) -> list[str]:
