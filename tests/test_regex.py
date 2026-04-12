@@ -108,6 +108,22 @@ def test_org_nr_case_insensitive_label():
     assert "556789-1234" in _org_nrs(spans)
 
 
+def _payment_refs(spans, kind):
+    return {s[3] for s in spans if s[2] == kind}
+
+
+def test_ocr_reference_number_detection():
+    text = "OCR ref: 1234567890"
+    spans = detect_regex(text)
+    assert "1234567890" in _payment_refs(spans, "OCR")
+
+
+def test_kid_reference_number_detection():
+    text = "KID-nummer 1234 5678"
+    spans = detect_regex(text)
+    assert "1234 5678" in _payment_refs(spans, "KID")
+
+
 def test_ipv4_detection():
     text = "Server at 192.168.1.100 and 10.0.0.1 are online."
     spans = detect_regex(text)

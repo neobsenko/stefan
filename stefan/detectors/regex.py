@@ -178,6 +178,23 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         ),
         1,
     ),
+    # Labeled payment references such as OCR ref / OCR-nummer and KID.
+    (
+        "OCR",
+        re.compile(
+            r"(?i)\bOCR(?:[\s-]*(?:nr\.?|nummer|ref(?:erens)?\.?))?"
+            r"\s*[:#-]?\s*(\d(?:[\d\s-]*\d){3,})\b"
+        ),
+        1,
+    ),
+    (
+        "KID",
+        re.compile(
+            r"(?i)\bKID(?:[\s-]*(?:nr\.?|nummer|ref(?:erens)?\.?))?"
+            r"\s*[:#-]?\s*(\d(?:[\d\s-]*\d){3,})\b"
+        ),
+        1,
+    ),
     # Swedish personnummer — dash required (no bare digit runs).
     # Last four may be digits or a standard mask (XXXX / xxxx / ****).
     (

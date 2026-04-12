@@ -46,6 +46,13 @@ def test_bank_terms_greetings_and_ok_not_entities():
         assert token not in mapping.values()
 
 
+def test_ocr_reference_number_is_redacted():
+    text = "OCR ref: 1234567890"
+    redacted, mapping = redact(text, use_spacy=False)
+    assert "1234567890" not in redacted
+    assert "1234567890" in _values_by_prefix(mapping, "OCR_")
+
+
 def test_trygg_hansa_and_saint_gobain_are_org():
     text = "försäkringen hos Trygg-Hansa. KAM hos Saint-Gobain."
     _, mapping = redact(text, use_spacy=False)
@@ -81,4 +88,3 @@ def test_phone_does_not_consume_closing_parenthesis():
     assert any(v == "+46 73 555 12 34" for v in mapping.values())
     assert redacted.endswith(")")
     assert ")" in redacted
-
