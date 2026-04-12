@@ -43,7 +43,7 @@
     }
     :root {
       color-scheme: dark;
-      /* Zinc / Emerald — premium dashboard */
+      /* Zinc / Emerald — local tool UI */
       --bg-page: #09090b;
       --bg-surface: #121214;
       --bg-elevated: #18181b;
@@ -63,12 +63,8 @@
     @media (prefers-reduced-motion: reduce) {
       #editor span.ent { transition: none; }
       .primary { transition: none; }
-      .primary.primary--action:hover:not(:disabled),
-      .primary.primary--success:hover:not(:disabled) { transform: none !important; }
       .toolbar-btn { transition: none; }
       .preset-chip { transition: none; }
-      .preset-chip:hover { transform: none !important; }
-      .status-pulse { animation: none !important; }
     }
     * { box-sizing: border-box; }
     html, body {
@@ -81,7 +77,7 @@
       /* 16px base improves legibility for readers who prefer larger UI text */
       font-size: 16px;
       line-height: 1.55;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -90,7 +86,7 @@
     }
     h1, h2 {
       font-weight: 600;
-      letter-spacing: -0.025em;
+      letter-spacing: 0;
     }
     h2 { font-size: 1.25rem; }
     .meta-label {
@@ -117,10 +113,7 @@
       width: 100%;
       background: var(--bg-surface);
       border: 1px solid var(--border-card);
-      border-radius: 0.875rem;
-      box-shadow:
-        0 25px 50px -12px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      border-radius: 0.5rem;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -142,19 +135,15 @@
       font-size: 1.125rem;
       font-weight: 700;
       color: var(--zinc-100);
-      letter-spacing: -0.03em;
+      letter-spacing: 0;
       margin: 0;
     }
-    .brand-badge {
-      font-size: 11px;
-      font-weight: 600;
+    .brand-note {
+      font-size: 0.875rem;
+      font-weight: 400;
       line-height: 1.25;
-      color: var(--emerald-400);
-      background: rgba(52, 211, 153, 0.1);
-      padding: 0.2rem 0.55rem;
-      border-radius: 9999px;
-      border: 1px solid rgba(52, 211, 153, 0.2);
-      letter-spacing: 0.04em;
+      color: var(--zinc-500);
+      letter-spacing: 0;
     }
     .tagline {
       font-size: 1rem;
@@ -192,7 +181,7 @@
       font-size: 0.875rem;
       font-weight: 500;
       font-family: inherit;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       color: var(--zinc-300);
       background: transparent;
       border: 1px solid var(--zinc-700);
@@ -212,7 +201,7 @@
     .toolbar-hint {
       font-size: 0.9375rem;
       color: var(--zinc-500);
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       line-height: 1.45;
       flex: 1 1 10rem;
       min-width: 0;
@@ -229,14 +218,13 @@
       position: relative;
       background: #0e0e11;
       border: 1px solid rgba(39, 39, 42, 0.8);
-      border-radius: 0.5625rem;
+      border-radius: 0.5rem;
       padding: 1.125rem;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, border-style 0.15s ease;
+      transition: border-color 0.2s ease, border-style 0.15s ease;
     }
     .editor-shell.editor-drag-active .editor-frame {
       border-style: dashed;
       border-color: rgba(52, 211, 153, 0.65);
-      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
     }
     .editor-drop-overlay {
       position: absolute;
@@ -245,12 +233,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 0.5625rem;
+      border-radius: 0.5rem;
       background: rgba(9, 9, 11, 0.82);
       color: var(--emerald-400);
       font-size: 1rem;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       pointer-events: none;
       opacity: 0;
       visibility: hidden;
@@ -262,7 +250,6 @@
     }
     .editor-frame:focus-within {
       border-color: rgba(16, 185, 129, 0.4);
-      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2);
     }
     #editor {
       flex: 0 1 auto;
@@ -273,7 +260,7 @@
       font-family: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 16px;
       line-height: 1.55;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       color: var(--zinc-300);
       padding: 0;
       margin: 0;
@@ -331,8 +318,6 @@
       cursor: pointer;
       background: rgba(39, 39, 42, 0.85);
       border: 1px solid rgba(113, 113, 122, 0.5);
-      border-left-width: 2px;
-      border-left-color: rgba(113, 113, 122, 0.85);
       transition: background 0.15s ease, border-color 0.15s ease;
     }
     #editor span.ent.redaction:hover {
@@ -341,62 +326,50 @@
     #editor span.ent.PERSON {
       background: rgba(59, 130, 246, 0.1);
       border-color: rgba(59, 130, 246, 0.5);
-      border-left-color: rgb(59, 130, 246);
     }
     #editor span.ent.LOCATION {
       background: rgba(249, 115, 22, 0.1);
       border-color: rgba(249, 115, 22, 0.5);
-      border-left-color: rgb(249, 115, 22);
     }
     #editor span.ent.ORG {
       background: rgba(139, 92, 246, 0.1);
       border-color: rgba(139, 92, 246, 0.5);
-      border-left-color: rgb(139, 92, 246);
     }
     #editor span.ent.ORG_NR {
       background: rgba(100, 116, 139, 0.1);
       border-color: rgba(100, 116, 139, 0.5);
-      border-left-color: rgb(100, 116, 139);
     }
     #editor span.ent.EMAIL {
       background: rgba(14, 165, 233, 0.1);
       border-color: rgba(14, 165, 233, 0.5);
-      border-left-color: rgb(14, 165, 233);
     }
     #editor span.ent.PHONE {
       background: rgba(244, 63, 94, 0.1);
       border-color: rgba(244, 63, 94, 0.5);
-      border-left-color: rgb(244, 63, 94);
     }
     #editor span.ent.URL {
       background: rgba(20, 184, 166, 0.1);
       border-color: rgba(20, 184, 166, 0.5);
-      border-left-color: rgb(20, 184, 166);
     }
     #editor span.ent.SSN {
       background: rgba(239, 68, 68, 0.1);
       border-color: rgba(239, 68, 68, 0.5);
-      border-left-color: rgb(239, 68, 68);
     }
     #editor span.ent.IP {
       background: rgba(6, 182, 212, 0.1);
       border-color: rgba(6, 182, 212, 0.5);
-      border-left-color: rgb(6, 182, 212);
     }
     #editor span.ent.IBAN {
       background: rgba(245, 158, 11, 0.1);
       border-color: rgba(245, 158, 11, 0.5);
-      border-left-color: rgb(245, 158, 11);
     }
     #editor span.ent.CONTACT {
       background: rgba(217, 70, 239, 0.1);
       border-color: rgba(217, 70, 239, 0.5);
-      border-left-color: rgb(217, 70, 239);
     }
     #editor span.ent.ITEM {
       background: rgba(113, 113, 122, 0.1);
       border-color: rgba(113, 113, 122, 0.5);
-      border-left-color: rgb(113, 113, 122);
     }
     .action-bar {
       flex-shrink: 0;
@@ -424,7 +397,7 @@
       padding: 0.45rem 0.65rem;
       font-size: 0.75rem;
       font-weight: 600;
-      letter-spacing: 0.04em;
+      letter-spacing: 0;
       font-family: inherit;
       appearance: none;
       -webkit-appearance: none;
@@ -434,34 +407,22 @@
       border-radius: 0.375rem;
       user-select: none;
       cursor: pointer;
-      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease,
-        color 0.15s ease, border-color 0.15s ease;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .preset-chip:hover:not(.preset-chip--selected) {
       color: var(--bg-page);
       background: var(--emerald-400);
       border-color: rgba(52, 211, 153, 0.5);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.35),
-        0 0 25px rgba(16, 185, 129, 0.3);
-      transform: translateY(-1px);
     }
     .preset-chip--selected {
       color: var(--bg-page);
       background: var(--emerald-500);
       border: 1px solid rgba(52, 211, 153, 0.5);
       font-weight: 600;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(52, 211, 153, 0.15);
     }
     .preset-chip--selected:hover {
       background: var(--emerald-400);
       border-color: rgba(52, 211, 153, 0.55);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.35),
-        0 0 25px rgba(16, 185, 129, 0.28);
-      transform: translateY(-1px);
     }
     .preset-chip:focus-visible {
       outline: 2px solid rgba(52, 211, 153, 0.6);
@@ -485,32 +446,22 @@
       padding: 0.875rem 1.25rem;
       font-size: 1rem;
       font-weight: 600;
-      letter-spacing: -0.02em;
-      border-radius: 0.5625rem;
+      letter-spacing: 0;
+      border-radius: 0.5rem;
       text-align: center;
-      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .primary.primary--action {
       color: var(--bg-page);
       cursor: pointer;
       background: var(--emerald-500);
       border: 1px solid rgba(52, 211, 153, 0.5);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(52, 211, 153, 0.15);
     }
     .primary.primary--action:hover:not(:disabled) {
       background: var(--emerald-400);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.35),
-        0 0 25px rgba(16, 185, 129, 0.3);
-      transform: translateY(-1px);
     }
     .primary.primary--action:active:not(:disabled) {
-      transform: translateY(0) scale(0.98);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        0 0 12px rgba(16, 185, 129, 0.2);
+      background: var(--emerald-600);
     }
     .primary:focus-visible {
       outline: 2px solid rgba(52, 211, 153, 0.6);
@@ -520,7 +471,6 @@
       background: var(--zinc-800);
       color: var(--zinc-300);
       cursor: wait;
-      box-shadow: none;
       border: 1px solid var(--border-card);
       font-weight: 500;
     }
@@ -531,31 +481,18 @@
       background: var(--emerald-500);
       border: 1px solid rgba(52, 211, 153, 0.5);
       font-weight: 600;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(52, 211, 153, 0.15);
     }
     .primary.primary--success {
       color: var(--bg-page);
       cursor: pointer;
       background: var(--emerald-500);
       border: 1px solid rgba(52, 211, 153, 0.5);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(52, 211, 153, 0.15);
     }
     .primary.primary--success:hover:not(:disabled) {
       background: var(--emerald-400);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.35),
-        0 0 25px rgba(16, 185, 129, 0.3);
-      transform: translateY(-1px);
     }
     .primary.primary--success:active:not(:disabled) {
-      transform: translateY(0) scale(0.98);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        0 0 12px rgba(16, 185, 129, 0.2);
+      background: var(--emerald-600);
     }
     .primary:disabled {
       opacity: 0.85;
@@ -567,21 +504,6 @@
       gap: 0.625rem;
       margin-top: 0.5rem;
       min-height: 1.35em;
-    }
-    .status-wrap:not(:has(.status-text:not(:empty))) .status-pulse {
-      display: none;
-    }
-    .status-pulse {
-      flex-shrink: 0;
-      width: 0.5625rem;
-      height: 0.5625rem;
-      border-radius: 9999px;
-      background: var(--emerald-500);
-      animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    @keyframes status-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
     }
     .status-text {
       font-family: "IBM Plex Mono", ui-monospace, monospace;
@@ -605,7 +527,7 @@
       display: inline-flex;
       align-items: center;
       white-space: nowrap;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
     }
     .clear:hover:not(.clear--inactive) { color: var(--zinc-300); }
     .clear.clear--inactive {
@@ -615,22 +537,20 @@
     }
     .popup {
       position: fixed;
-      background: rgba(24, 24, 27, 0.95);
-      -webkit-backdrop-filter: blur(12px);
-      backdrop-filter: blur(12px);
+      background: var(--bg-elevated);
       border: 1px solid rgba(63, 63, 70, 0.6);
-      border-radius: 0.875rem;
+      border-radius: 0.5rem;
       padding: 0.375rem;
       display: flex;
       flex-direction: column;
       gap: 0.375rem;
       align-items: stretch;
       min-width: min(100vw - 16px, 22rem);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
       z-index: 50;
       overflow: hidden;
       font-family: inherit;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
     }
     .popup-row {
       display: flex;
@@ -650,8 +570,7 @@
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--zinc-500);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0;
       padding: 0.5rem 0.375rem 0;
       margin-top: 0.125rem;
       border-top: 1px solid rgba(39, 39, 42, 0.8);
@@ -705,7 +624,7 @@
     <div class="app-header section">
       <div class="brand-row">
         <span class="brand">Stefan</span>
-        <span class="brand-badge">LOCAL NODE</span>
+        <span class="brand-note">lokalt</span>
       </div>
       <p class="tagline">Döljer namn, nummer och känsliga uppgifter innan du klistrar in i AI. Körs lokalt i din webbläsare.</p>
       <div class="toolbar">
@@ -726,15 +645,14 @@
     </div>
     <div class="action-bar">
       <div class="preset-row" role="group" aria-label="Välj promptstil (valfritt)">
-        <button type="button" class="preset-chip" data-preset="summarize" aria-pressed="false">SAMMANFATTA</button>
-        <button type="button" class="preset-chip" data-preset="deadlines" aria-pressed="false">DEADLINES</button>
-        <button type="button" class="preset-chip" data-preset="costs" aria-pressed="false">EKONOMI</button>
-        <button type="button" class="preset-chip" data-preset="custom" aria-pressed="false">EGET VAL</button>
+        <button type="button" class="preset-chip" data-preset="summarize" aria-pressed="false">Sammanfatta</button>
+        <button type="button" class="preset-chip" data-preset="deadlines" aria-pressed="false">Deadlines</button>
+        <button type="button" class="preset-chip" data-preset="costs" aria-pressed="false">Ekonomi</button>
+        <button type="button" class="preset-chip" data-preset="custom" aria-pressed="false">Eget val</button>
       </div>
       <button type="button" id="primary" class="primary hidden" aria-hidden="true"></button>
       <div class="action-bar-row">
         <div class="status-wrap">
-          <span class="status-pulse" aria-hidden="true"></span>
           <div id="status" class="status-text" role="status"></div>
         </div>
         <a id="clear" class="clear clear--inactive" href="#" aria-disabled="true">Börja om</a>
@@ -920,7 +838,7 @@ const CLIPBOARD_INSTRUCTION_OPEN =
 const CLIPBOARD_INSTRUCTION_CLOSE =
   "[End of redacted text. Keep all placeholders exactly as written. The reply must be ready to select-all, copy, and paste elsewhere without cleanup.]";
 
-/** When preset SAMMANFATTA is selected — appended after the redacted body (before the English close line). */
+/** When the summarize preset is selected — appended after the redacted body (before the English close line). */
 const CLIPBOARD_SUMMARIZE_SV =
   "Du är en assistent för svenska byggföretag. Sammanfatta följande mejl/dokument i punktform på svenska. Strukturen ska vara:\n\n"
   + "Huvudbudskap: (1-2 meningar)\n\n"
@@ -936,7 +854,7 @@ const CLIPBOARD_SUMMARIZE_SV =
   + "- [det som kan gå fel om inget görs]\n\n"
   + "Var konkret. Hoppa över artighetsfraser. Använd platshållarna (PERSON_1, ORG_2 etc) exakt som de står — de återställs automatiskt efteråt. Formatera så att användaren kan kopiera hela svaret och klistra in det i mejl, dokument eller anteckningar utan att behöva fixa radbrytningar eller struktur.";
 
-/** When preset DEADLINES is selected — appended after the redacted body (before the English close line). */
+/** When the deadlines preset is selected — appended after the redacted body (before the English close line). */
 const CLIPBOARD_DEADLINES_SV =
   "Du är en assistent för svenska byggföretag. Läs följande text och extrahera ENBART deadlines, datum och tidskritiska saker. Strukturen ska vara:\n\n"
   + "AKUT (inom 24 timmar):\n"
@@ -951,7 +869,7 @@ const CLIPBOARD_DEADLINES_SV =
   + "- [vilken lag/myndighet] — [frist] — [konsekvens om missad]\n\n"
   + "Sortera kronologiskt inom varje kategori. Om en deadline saknas men borde finnas, flagga det med \"Deadline saknas\". Använd platshållarna exakt som de står. Formatera så att listorna och rubrikerna går att kopiera och klistra in någon annanstans med bibehållen läsbarhet.";
 
-/** When preset EKONOMI (costs) is selected — appended after the redacted body (before the English close line). */
+/** When the costs preset is selected — appended after the redacted body (before the English close line). */
 const CLIPBOARD_COSTS_SV =
   "Du är en ekonomiassistent för svenska byggföretag. Läs följande text och extrahera all ekonomisk information. Strukturen ska vara:\n\n"
   + "Fakturor att skicka:\n"
