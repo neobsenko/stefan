@@ -35,6 +35,12 @@ def test_url_detection():
     assert any("test.se" in u for u in urls)
 
 
+def test_social_profile_path_url_detection():
+    text = "Profil: /in/perolof-hagglund"
+    spans = detect_regex(text)
+    assert "/in/perolof-hagglund" in _texts(spans, "URL")
+
+
 def test_swedish_personnummer_full():
     text = "Personnummer: 19850615-1234 är registrerat."
     spans = detect_regex(text)
@@ -108,6 +114,23 @@ def test_org_nr_case_insensitive_label():
     assert "556789-1234" in _org_nrs(spans)
 
 
+@pytest.mark.parametrize(
+    "label,number",
+    [
+        ("Org.nr", "232100-0016"),
+        ("Org.nr.", "232100-0016"),
+        ("Org.nr:", "232100-0016"),
+        ("Org nr", "556789-0123"),
+        ("Orgnr", "556789-0123"),
+        ("Organisationsnummer", "556789-0123"),
+    ],
+)
+def test_org_nr_label_variants_beat_ssn(label, number):
+    spans = detect_regex(f"{label} {number}")
+    assert number in _org_nrs(spans)
+    assert number not in _ssns(spans)
+
+
 def _payment_refs(spans, kind):
     return {s[3] for s in spans if s[2] == kind}
 
@@ -115,7 +138,21 @@ def _payment_refs(spans, kind):
 def test_ocr_reference_number_detection():
     text = "OCR ref: 1234567890"
     spans = detect_regex(text)
-    assert "1234567890" in _payment_refs(spans, "OCR")
+    assert "1234567890" in _payment_refs(spans, "PAYMENT_REF")
+
+
+@pytest.mark.parametrize(
+    "text,number",
+    [
+        ("OCR: 1234567890", "1234567890"),
+        ("OCR-nummer 9876543210", "9876543210"),
+        ("Referens: 87654321", "87654321"),
+    ],
+)
+def test_payment_ref_label_detection(text, number):
+    spans = detect_regex(text)
+    assert number in _payment_refs(spans, "PAYMENT_REF")
+    assert number not in _payment_refs(spans, "OCR")
 
 
 def test_kid_reference_number_detection():

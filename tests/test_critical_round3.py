@@ -50,7 +50,7 @@ def test_ocr_reference_number_is_redacted():
     text = "OCR ref: 1234567890"
     redacted, mapping = redact(text, use_spacy=False)
     assert "1234567890" not in redacted
-    assert "1234567890" in _values_by_prefix(mapping, "OCR_")
+    assert "1234567890" in _values_by_prefix(mapping, "PAYMENT_REF_")
 
 
 def test_trygg_hansa_and_saint_gobain_are_org():

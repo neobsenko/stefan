@@ -55,6 +55,14 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         ),
         0,
     ),
+    # Swedish OCR/payment reference labels. Must run before bank/phone/SSN patterns.
+    (
+        "PAYMENT_REF",
+        re.compile(
+            r"(?i)\b(?:OCR|OCR-nr|OCR-nummer|OCR\s+ref|Referens|Ref):?\s*(\d{6,25})\b"
+        ),
+        1,
+    ),
     # Swedish Bankgiro (3–4 digits, hyphen, 4 digits) — before PHONE.
     # Exclude year-shaped refs (2026-9999); require separator/line-start (not BL-2026-…).
     (
@@ -131,6 +139,17 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         ),
         0,
     ),
+    # Social profile paths/domains without protocol, e.g. /in/name or linkedin.com/in/name.
+    (
+        "URL",
+        re.compile(
+            r"(?<!\w)(?:/in/[a-z0-9\-]+|"
+            r"(?:linkedin\.com|facebook\.com|twitter\.com|x\.com|instagram\.com|tiktok\.com)"
+            r"/[a-z0-9\.\-_/]+)\b",
+            re.IGNORECASE,
+        ),
+        0,
+    ),
     # Email addresses
     (
         "EMAIL",
@@ -174,7 +193,7 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
     (
         "ORG_NR",
         re.compile(
-            r"(?i)(?:org\.?\s*nr|orgnr|organisationsnummer)\s*:?\s*(\d{6}-\d{4})\b"
+            r"(?i)(?:org\.?\s*nr\.?:?|orgnr|organisationsnummer)\s*(\d{6}-\d{4})\b"
         ),
         1,
     ),
@@ -445,7 +464,9 @@ def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
     spans = adjusted
 
     # IBAN and Swedish payment routing numbers must never be misclassified as PHONE.
-    _PROTECT_PHONE = frozenset({"IBAN", "BANKGIRO", "PLUSGIRO", "BANK_ACCOUNT"})
+    _PROTECT_PHONE = frozenset(
+        {"IBAN", "PAYMENT_REF", "BANKGIRO", "PLUSGIRO", "BANK_ACCOUNT"}
+    )
     protected_spans = {(s, e) for s, e, t, _ in spans if t in _PROTECT_PHONE}
 
     spans = [
@@ -466,5 +487,17 @@ def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
         sp
         for sp in spans
         if not (sp[2] == "SSN" and (sp[0], sp[1]) in org_nr_spans)
+    ]
+    payment_ref_spans = {(s, e) for s, e, t, _ in spans if t == "PAYMENT_REF"}
+    spans = [
+        sp
+        for sp in spans
+        if not (
+            sp[2] == "OCR"
+            and any(
+                _intervals_overlap(sp[0], sp[1], i0, i1)
+                for i0, i1 in payment_ref_spans
+            )
+        )
     ]
     return spans

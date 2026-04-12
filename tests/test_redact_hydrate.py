@@ -52,6 +52,14 @@ def test_hydrate_roundtrip_mixed_entities():
     assert restored == original
 
 
+def test_hydrate_roundtrip_payment_ref():
+    original = "Betala med OCR: 1234567890."
+    redacted, mapping = redact(original, use_spacy=False)
+    assert "PAYMENT_REF_1" in redacted
+    assert mapping["PAYMENT_REF_1"] == "1234567890"
+    assert hydrate(redacted, mapping) == original
+
+
 def test_hydrate_unknown_placeholder_left_alone():
     text = "Hello PERSON_99 and EMAIL_42."
     restored = hydrate(text, {})

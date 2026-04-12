@@ -25,12 +25,35 @@ _ORG_LINKER_WORDS = frozenset(
     }
 )
 
-# Higher number = higher priority. Regex > dictionary > spaCy.
+# Higher number = higher priority.
+# Hard regex identifiers must win over dictionaries; dictionary ORGs are locked above
+# fuzzy regex LOCATION/etc. so known companies cannot be reclassified by later NER.
 _PRIORITY = {
+    "regex_hard": 6,
+    "regex_org": 5,
+    "dictionary_org": 4,
     "regex": 3,
     "dictionary": 2,
     "spacy": 1,
 }
+
+_HARD_REGEX_TYPES = frozenset(
+    {
+        "BANK_ACCOUNT",
+        "BANKGIRO",
+        "EMAIL",
+        "IBAN",
+        "IP",
+        "KID",
+        "OCR",
+        "ORG_NR",
+        "PAYMENT_REF",
+        "PHONE",
+        "PLUSGIRO",
+        "SSN",
+        "URL",
+    }
+)
 
 # Max run of whitespace-only gap when gluing adjacent PERSON spans.
 _MAX_PERSON_WS_GAP = 48
@@ -244,6 +267,25 @@ def _merge_non_person(
     accepted: List[Tuple[int, int, str, str, int]] = []
     for span in spans:
         start, end = span[0], span[1]
+        overlapping = [a for a in accepted if _overlaps((start, end), (a[0], a[1]))]
+        if overlapping:
+            # A wider ORG span from another detector may extend a locked dictionary
+            # ORG without changing its type. This keeps "Skanska Sverige AB" whole
+            # while still preventing LOCATION/PERSON reclassification of "Skanska".
+            if (
+                span[2] == "ORG"
+                and all(a[2] == "ORG" for a in overlapping)
+                and all(start <= a[0] and a[1] <= end for a in overlapping)
+                and (end - start) > max(a[1] - a[0] for a in overlapping)
+                and not any(a[4] == _PRIORITY["regex_hard"] for a in overlapping)
+            ):
+                accepted = [
+                    a
+                    for a in accepted
+                    if not _overlaps((start, end), (a[0], a[1]))
+                ]
+            else:
+                continue
         if any(_overlaps((start, end), (a[0], a[1])) for a in accepted):
             continue
         accepted.append(span)
@@ -412,6 +454,54 @@ def _merge_person_widest(
     return accepted
 
 
+_LOOKAHEAD_NAME_RE = re.compile(r"[^\W\d_]+(?:-[^\W\d_]+)*", re.UNICODE)
+
+
+def _is_capitalized_alpha_token(token: str) -> bool:
+    parts = token.split("-")
+    return bool(parts) and all(
+        len(part) > 2 and part.isalpha() and part[0].isupper()
+        for part in parts
+    )
+
+
+def _extend_person_lookahead(
+    spans: List[Tuple[int, int, str, str, int]],
+    text: str,
+) -> List[Tuple[int, int, str, str, int]]:
+    """Extend PERSON by one following same-line capitalized token."""
+    if not spans:
+        return spans
+    stopwords = {w.lower() for w in _load_stopwords()}
+    occupied = [(s[0], s[1]) for s in spans]
+    out: List[Tuple[int, int, str, str, int]] = []
+    for start, end, etype, val, pri in spans:
+        if etype != "PERSON":
+            out.append((start, end, etype, val, pri))
+            continue
+        i = end
+        while i < len(text) and text[i] in " \t":
+            i += 1
+        if i == end or i >= len(text) or text[i] in "\r\n":
+            out.append((start, end, etype, val, pri))
+            continue
+        m = _LOOKAHEAD_NAME_RE.match(text, i)
+        if not m:
+            out.append((start, end, etype, val, pri))
+            continue
+        token = m.group(0)
+        new_end = m.end()
+        if (
+            _is_capitalized_alpha_token(token)
+            and token.lower() not in stopwords
+            and not any(_overlaps((i, new_end), iv) for iv in occupied)
+        ):
+            out.append((start, new_end, etype, text[start:new_end], pri))
+        else:
+            out.append((start, end, etype, val, pri))
+    return out
+
+
 def _drop_non_person_subsumed_by_person(
     accepted_np: List[Tuple[int, int, str, str, int]],
     accepted_p: List[Tuple[int, int, str, str, int]],
@@ -454,7 +544,8 @@ def merge_spans(
 ) -> List[Tuple[int, int, str, str]]:
     """Merge spans from multiple sources, resolving overlaps by priority.
 
-    Non-PERSON entities use source priority (regex > dictionary > spaCy), then length.
+    Non-PERSON entities use source priority, then length. Hard regex identifiers
+    stay above dictionaries; dictionary ORGs stay above fuzzy entity detectors.
 
     Overlapping PERSON spans from any source: keep the **widest** span; tie-break by
     source priority.
@@ -463,9 +554,20 @@ def merge_spans(
     """
     tagged: List[Tuple[int, int, str, str, int]] = []
     for s in regex_spans:
-        tagged.append((*s, _PRIORITY["regex"]))
+        if s[2] in _HARD_REGEX_TYPES:
+            priority = _PRIORITY["regex_hard"]
+        elif s[2] == "ORG":
+            priority = _PRIORITY["regex_org"]
+        else:
+            priority = _PRIORITY["regex"]
+        tagged.append((*s, priority))
     for s in dict_spans:
-        tagged.append((*s, _PRIORITY["dictionary"]))
+        priority = (
+            _PRIORITY["dictionary_org"]
+            if s[2] == "ORG"
+            else _PRIORITY["dictionary"]
+        )
+        tagged.append((*s, priority))
     for s in spacy_spans:
         tagged.append((*s, _PRIORITY["spacy"]))
     tagged = _filter_stopword_spans(tagged)
@@ -478,6 +580,9 @@ def merge_spans(
                 continue
             trimmed.append((ns, ne, etype, text[ns:ne], pri))
         tagged = trimmed
+
+    if text is not None:
+        tagged = _extend_person_lookahead(tagged, text)
 
     non_person = [t for t in tagged if t[2] != "PERSON"]
     person = [t for t in tagged if t[2] == "PERSON"]

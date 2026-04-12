@@ -353,3 +353,43 @@ def test_redact_bouygues_construction_and_intl_org_suffixes():
         "Wienerberger International",
     ):
         assert phrase in mapping.values()
+
+
+def test_dictionary_org_type_lock_beats_fuzzy_location():
+    text = "Veidekke"
+    merged = merge_spans(
+        [(0, len(text), "LOCATION", text)],
+        [(0, len(text), "ORG", text)],
+        [],
+        text=text,
+    )
+    assert merged == [(0, len(text), "ORG", text)]
+
+
+def test_redact_construction_orgs_not_person_or_location():
+    text = "Veidekke och Skanska deltog."
+    _, mapping = redact(text, use_spacy=False)
+    assert "Veidekke" in [v for k, v in mapping.items() if k.startswith("ORG_")]
+    assert "Skanska" in [v for k, v in mapping.items() if k.startswith("ORG_")]
+    assert "Skanska" not in [v for k, v in mapping.items() if k.startswith("PERSON_")]
+    assert "Veidekke" not in [v for k, v in mapping.items() if k.startswith("LOCATION_")]
+
+
+def test_person_lookahead_extends_capitalized_surname():
+    text = "Tobias Hjälmqvist ringde."
+    _, mapping = redact(text, use_spacy=False)
+    assert "Tobias Hjälmqvist" in mapping.values()
+    assert "Tobias" not in mapping.values()
+
+
+def test_person_lookahead_extends_after_hyphenated_first_name():
+    text = "Hans-Jürgen Müller ringde."
+    _, mapping = redact(text, use_spacy=False)
+    assert "Hans-Jürgen Müller" in mapping.values()
+    assert "Hans-Jürgen" not in mapping.values()
+
+
+def test_sophiahemmet_redacts_as_org():
+    text = "Sophiahemmet svarade."
+    _, mapping = redact(text, use_spacy=False)
+    assert "Sophiahemmet" in [v for k, v in mapping.items() if k.startswith("ORG_")]

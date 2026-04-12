@@ -667,9 +667,9 @@
 /** pdf.js loads from CDN only when the user picks/drops a PDF (avoids blocking paint / flaky CDN). */
 
 /** Paste → hydrate only if core placeholders appear (spec) and a mapping exists. */
-const HYDRATE_DETECT_RE = /\b(PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN)_\d+\b/;
+const HYDRATE_DETECT_RE = /\b(PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN|PAYMENT_REF)_\d+\b/;
 /** Replace including ITEM_* when hydrating (manual tags / older exports). */
-const HYDRATE_REPLACE_RE = /\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN|ITEM)_\d+\b/g;
+const HYDRATE_REPLACE_RE = /\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|IBAN|PAYMENT_REF|ITEM)_\d+\b/g;
 const STORAGE_KEY = "stefan_mapping";
 const CHATGPT_URL = "https://chatgpt.com/";
 /** Invisible anchor so the caret can sit after the last <span> highlight (browser quirk). */
@@ -753,7 +753,7 @@ function normalizePastedText(t) {
   let s = normalizeText(t);
   s = s.replace(/[\u2018\u2019\u201C\u201D\u00B4]/g, "'");
   s = s.replace(
-    /`(\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP)_\d+)\b`/g,
+    /`(\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|PAYMENT_REF)_\d+)\b`/g,
     "$1"
   );
   return s;
@@ -970,7 +970,7 @@ function renderEditor() {
       return;
     }
     const sorted = [...state.spans].sort((a, b) => a.start - b.start);
-    const monoTypes = new Set(["EMAIL", "PHONE", "URL", "SSN", "IP", "ORG_NR", "IBAN"]);
+    const monoTypes = new Set(["EMAIL", "PHONE", "URL", "SSN", "IP", "ORG_NR", "IBAN", "PAYMENT_REF"]);
     let html = "";
     let cursor = 0;
     for (let i = 0; i < sorted.length; i++) {

@@ -5,7 +5,7 @@ from typing import Dict
 
 # Match any placeholder of the form TYPE_N where TYPE is one of our known types.
 _PLACEHOLDER_RE = re.compile(
-    r"\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP)_\d+\b"
+    r"\b(?:PERSON|ORG|ORG_NR|LOCATION|EMAIL|PHONE|URL|SSN|IP|PAYMENT_REF)_\d+\b"
 )
 
 

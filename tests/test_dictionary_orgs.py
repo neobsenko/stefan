@@ -69,3 +69,49 @@ def test_municipal_stadsbyggnadskontoret():
     reload_org_dictionaries()
     spans = detect_dictionary_orgs("ärendet hos Stadsbyggnadskontoret.")
     assert "Stadsbyggnadskontoret" in _orgs(spans)
+
+
+def test_type_locked_construction_orgs_present():
+    reload_org_dictionaries()
+    names = (
+        "Veidekke",
+        "Riksbyggen",
+        "Skanska",
+        "NCC",
+        "Peab",
+        "JM",
+        "Manpower",
+        "Adecco",
+        "Randstad",
+        "Saint-Gobain",
+        "Bouygues",
+        "Bosch",
+        "Bosch Rexroth",
+        "KONE",
+        "Lindab",
+        "Systemair",
+        "Fagerhult",
+        "Securitas",
+    )
+    spans = detect_dictionary_orgs(" | ".join(names))
+    orgs = _orgs(spans)
+    for name in names:
+        assert name in orgs
+
+
+def test_swedish_hospitals_present():
+    reload_org_dictionaries()
+    names = (
+        "Sophiahemmet",
+        "Karolinska",
+        "Sahlgrenska",
+        "Akademiska",
+        "Danderyds Sjukhus",
+        "Södersjukhuset",
+        "Capio",
+        "Aleris",
+    )
+    spans = detect_dictionary_orgs(" | ".join(names))
+    orgs = _orgs(spans)
+    for name in names:
+        assert name in orgs
