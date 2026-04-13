@@ -59,3 +59,15 @@ def test_city_authorities_are_locations_not_orgs(city_authority):
 
     assert city_authority in _values(mapping, "LOCATION_")
     assert city_authority not in _values(mapping, "ORG_")
+
+
+def test_compact_postal_code_full_address_is_single_location():
+    text = "Plats: Mäster Samuelsgatan 16, 11144 Stockholm"
+    _, mapping = redact(text, use_spacy=False)
+    assert "Mäster Samuelsgatan 16, 11144 Stockholm" in _values(mapping, "LOCATION_")
+
+
+def test_compact_postal_code_vag_address_is_single_location():
+    text = "Adress: Drottning Kristinas väg 14, 11434 Stockholm"
+    _, mapping = redact(text, use_spacy=False)
+    assert "Drottning Kristinas väg 14, 11434 Stockholm" in _values(mapping, "LOCATION_")

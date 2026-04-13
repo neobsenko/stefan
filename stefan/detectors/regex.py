@@ -357,7 +357,7 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
             + _STREET_SUFFIX
             + rf"\s+{_STREET_OCCUPANCY}"
             + r"(?:,?\s*lgh\.?\s+\d+)?"
-            + r"(?:,?\s*\d{3}\s+\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
+            + r"(?:,?\s*\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
             + r"\b"
         ),
         0,
@@ -369,7 +369,7 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
             r"\b"
             + rf"(?:{_STREET_TOKEN}\s+){{1,3}}[Vv]äg\s+{_STREET_OCCUPANCY}"
             + r"(?:,?\s*lgh\.?\s+\d+)?"
-            + r"(?:,?\s*\d{3}\s+\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
+            + r"(?:,?\s*\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?"
             + r"\b"
         ),
         0,
@@ -379,7 +379,7 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
         "LOCATION",
         re.compile(
             r"\bBox\s+\d{1,5}"
-            r"(?:[,\s]+\d{3}\s+\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?\b"
+            r"(?:[,\s]+\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö\-]+)?\b"
         ),
         0,
     ),
