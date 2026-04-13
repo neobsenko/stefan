@@ -45,6 +45,10 @@ def _load_names() -> Set[str]:
     return names
 
 
+# Swedish postal code prefix that precedes city names: 5 digits with optional space (NNN NN or NNNNN) + space.
+# Used to exclude false PERSON matches (e.g. "Lund" in "203 93 Lund" or "Uppsala" in "481 82 Uppsala").
+_POSTAL_CODE_PREFIX_RE = re.compile(r"\d{3}\s?\d{2}\s+$")
+
 # Unicode word tokens (covers Polish, Nordic, etc.).
 _WORD_RE = re.compile(r"\b\w+\b", re.UNICODE)
 
@@ -96,6 +100,10 @@ def detect_dictionary(text: str) -> List[Tuple[int, int, str, str]]:
             nxt = tokens[i + 1].group(0)
             if nxt and nxt[0].islower():
                 continue
+
+        # Skip names that follow a Swedish postal code (e.g. "203 93 Lund").
+        if _POSTAL_CODE_PREFIX_RE.search(text[:w0]):
+            continue
 
         spans.append((match.start(), match.end(), "PERSON", word))
     return spans

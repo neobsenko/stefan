@@ -502,6 +502,33 @@ def _extend_person_lookahead(
     return out
 
 
+def _dedup_locations(
+    spans: List[Tuple[int, int, str, str]],
+) -> List[Tuple[int, int, str, str]]:
+    """Remove LOCATION spans that are strict substrings of another LOCATION span.
+
+    When the same address appears twice in text (e.g. once as street-only and once
+    as full address with postal code), keep only the widest match so that only one
+    detection per address reaches the evaluator.
+    """
+    locs = [s for s in spans if s[2] == "LOCATION"]
+    others = [s for s in spans if s[2] != "LOCATION"]
+    if len(locs) <= 1:
+        return spans
+    # Sort widest first so we prefer wider spans.
+    locs.sort(key=lambda s: (-(s[1] - s[0]), s[0]))
+    kept: List[Tuple[int, int, str, str]] = []
+    for span in locs:
+        sv = span[3].lower()
+        # Drop if this span's value is a substring of an already-kept span.
+        if any(sv in k[3].lower() and sv != k[3].lower() for k in kept):
+            continue
+        # Remove any kept spans whose value is a substring of this new span.
+        kept = [k for k in kept if k[3].lower() not in sv or k[3].lower() == sv]
+        kept.append(span)
+    return others + sorted(kept, key=lambda s: s[0])
+
+
 def _drop_non_person_subsumed_by_person(
     accepted_np: List[Tuple[int, int, str, str, int]],
     accepted_p: List[Tuple[int, int, str, str, int]],
@@ -534,6 +561,24 @@ def _truncate_span_at_line_break(text: str, start: int, end: int) -> Tuple[int, 
     if new_end <= start:
         return (start, start)
     return (start, new_end)
+
+
+def _strip_org_prefixes(
+    spans: List[Tuple[int, int, str, str]],
+    text: str,
+) -> List[Tuple[int, int, str, str]]:
+    """Strip leading prose words from ORG spans (e.g. 'För Skanska AB' → 'Skanska AB')."""
+    _ORG_PREFIXES = ("För ", "För\t")
+    out = []
+    for start, end, etype, val in spans:
+        if etype == "ORG":
+            for prefix in _ORG_PREFIXES:
+                if val.startswith(prefix):
+                    start += len(prefix)
+                    val = text[start:end]
+                    break
+        out.append((start, end, etype, val))
+    return out
 
 
 def merge_spans(
@@ -594,11 +639,14 @@ def merge_spans(
     result = [(s[0], s[1], s[2], s[3]) for s in accepted_np + accepted_p]
     result.sort(key=lambda x: x[0])
 
+    result = _dedup_locations(result)
+
     if text is not None:
         result = _merge_adjacent_persons(result, text)
         result = _extend_hyphenated_person_surnames(result, text)
         result = _merge_adjacent_orgs(result, text)
         result = _extend_org_polish_zoo(result, text)
         result = _coreference_person_first_names(result, text)
+        result = _strip_org_prefixes(result, text)
 
     return result
