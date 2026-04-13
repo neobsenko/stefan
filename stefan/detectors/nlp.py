@@ -3,7 +3,16 @@
 import os
 import sys
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional, Tuple
+
+# Ensure uv-managed site-packages is on sys.path so spacy is findable.
+_uv_sp = str(Path.home() / ".local/share/uv/python" )
+if _uv_sp and Path(_uv_sp).exists():
+    for _p in sorted(Path(_uv_sp).glob("cpython-*/lib/python*/site-packages")):
+        _p_str = str(_p)
+        if _p_str not in sys.path:
+            sys.path.insert(0, _p_str)
 
 # Web UI tries these in order when STEFAN_SPACY_MODEL is unset (fast sm, then md).
 _WEB_SERVE_MODEL_ORDER = ("sv_core_news_sm", "sv_core_news_md")

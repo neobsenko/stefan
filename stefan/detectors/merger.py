@@ -71,6 +71,18 @@ _QUOTED_NICK_RE = re.compile(
     r'^[ \t]+["\u201c\u201d][A-Za-zÀ-ÿ\-]+["\u201c\u201d][ \t]+$'
 )
 
+_SPACY_REFERENCE_CODE_RE = re.compile(r"^[A-ZÅÄÖ]{1,8}-20\d{2}-[A-Z0-9-]+$")
+_SPACY_ORG_ROLE_WORDS = frozenset(
+    {
+        "Beställare",
+        "Entreprenör",
+        "Huvudägare",
+        "Kontaktperson",
+        "Organisation",
+        "Protokollförare",
+    }
+)
+
 
 @lru_cache(maxsize=1)
 def _load_stopwords() -> Set[str]:
@@ -96,6 +108,28 @@ def _filter_stopword_spans(
         # (e.g. "Norska Polska Finska" merged as one PERSON span).
         tokens = re.findall(r"\b[\w\.-]+\b", value, re.UNICODE)
         if tokens and all(tok in stopwords for tok in tokens):
+            continue
+        out.append(span)
+    return out
+
+
+def _filter_spacy_false_positive_spans(
+    spans: List[Tuple[int, int, str, str, int]],
+) -> List[Tuple[int, int, str, str, int]]:
+    """Drop known-low-signal spaCy-only ORG/LOCATION false positives."""
+    out: List[Tuple[int, int, str, str, int]] = []
+    for span in spans:
+        _, _, entity_type, value, priority = span
+        if priority != _PRIORITY["spacy"]:
+            out.append(span)
+            continue
+        if entity_type == "ORG" and (
+            value in _SPACY_ORG_ROLE_WORDS or _SPACY_REFERENCE_CODE_RE.fullmatch(value)
+        ):
+            continue
+        if entity_type == "LOCATION" and "-" in value and not any(
+            ch.isdigit() for ch in value
+        ):
             continue
         out.append(span)
     return out
@@ -195,6 +229,8 @@ def _extend_hyphenated_person_surnames(
 
 
 def _org_gap_allows_merge(gap: str) -> bool:
+    if "\n" in gap or "\r" in gap:
+        return False
     if not gap.strip():
         return True
     parts = [p for p in re.split(r"\s+", gap.strip()) if p]
@@ -625,6 +661,8 @@ def merge_spans(
                 continue
             trimmed.append((ns, ne, etype, text[ns:ne], pri))
         tagged = trimmed
+
+    tagged = _filter_spacy_false_positive_spans(tagged)
 
     if text is not None:
         tagged = _extend_person_lookahead(tagged, text)
