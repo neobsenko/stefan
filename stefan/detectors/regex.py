@@ -28,6 +28,7 @@ _STREET_SUFFIX = (
 )
 _STREET_TOKEN = rf"[A-ZÅÄÖ][{_ORG_LC}\-]*"
 _STREET_OCCUPANCY = r"\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?"
+_MAJOR_SWEDISH_CITIES = r"(?:Stockholm|Göteborg|Uppsala)"
 
 # Swedish payment routing: must not match reference IDs (BL-2026-…, RS-…, year-prefixed, etc.).
 # Left context = line start or a separator (so not glued to letter-hyphen refs like "BL-2026-…").
@@ -247,6 +248,35 @@ PATTERNS: List[Tuple[str, re.Pattern, int]] = [
             + r"[ \t]+"
             + _ORG_SUFFIX
             + r"\b"
+        ),
+        0,
+    ),
+    # Major Swedish city names that commonly appear as standalone project locations.
+    (
+        "LOCATION",
+        re.compile(rf"\b{_MAJOR_SWEDISH_CITIES}\b"),
+        0,
+    ),
+    # Institutional and authority locations commonly used as project sites.
+    (
+        "LOCATION",
+        re.compile(
+            r"\b(?:"
+            r"Karolinska\s+Universitetssjukhuset(?:\s+Solna)?"
+            r"|Sahlgrenska\s+Universitetssjukhuset"
+            r"|Boverket"
+            r")\b"
+        ),
+        0,
+    ),
+    # Municipal areas/city authorities used as construction permitting locations.
+    (
+        "LOCATION",
+        re.compile(
+            rf"\b(?:"
+            rf"[{_ORG_UC}][{_ORG_LC}]+s\s+Stadsdelsförvaltning(?:en)?"
+            rf"|(?:{_MAJOR_SWEDISH_CITIES})s\s+Stad"
+            rf")\b"
         ),
         0,
     ),

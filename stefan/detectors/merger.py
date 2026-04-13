@@ -72,6 +72,17 @@ _QUOTED_NICK_RE = re.compile(
 )
 
 _SPACY_REFERENCE_CODE_RE = re.compile(r"^[A-ZÅÄÖ]{1,8}-20\d{2}-[A-Z0-9-]+$")
+_TRUSTED_REGEX_LOCATION_RE = re.compile(
+    r"^(?:"
+    r"Stockholm|Göteborg|Uppsala"
+    r"|Karolinska Universitetssjukhuset(?: Solna)?"
+    r"|Sahlgrenska Universitetssjukhuset"
+    r"|Boverket"
+    r"|[A-ZÅÄÖ][\wåäöÅÄÖ-]+s Stadsdelsförvaltning(?:en)?"
+    r"|(?:Stockholm|Göteborg|Uppsala)s Stad"
+    r")$",
+    re.UNICODE,
+)
 _SPACY_ORG_ROLE_WORDS = frozenset(
     {
         "Beställare",
@@ -305,10 +316,20 @@ def _merge_non_person(
         start, end = span[0], span[1]
         overlapping = [a for a in accepted if _overlaps((start, end), (a[0], a[1]))]
         if overlapping:
+            if (
+                all(a[2] == span[2] for a in overlapping)
+                and all(start <= a[0] and a[1] <= end for a in overlapping)
+                and (end - start) > max(a[1] - a[0] for a in overlapping)
+            ):
+                accepted = [
+                    a
+                    for a in accepted
+                    if not _overlaps((start, end), (a[0], a[1]))
+                ]
             # A wider ORG span from another detector may extend a locked dictionary
             # ORG without changing its type. This keeps "Skanska Sverige AB" whole
             # while still preventing LOCATION/PERSON reclassification of "Skanska".
-            if (
+            elif (
                 span[2] == "ORG"
                 and all(a[2] == "ORG" for a in overlapping)
                 and all(start <= a[0] and a[1] <= end for a in overlapping)
@@ -637,7 +658,9 @@ def merge_spans(
     for s in regex_spans:
         if s[2] in _HARD_REGEX_TYPES:
             priority = _PRIORITY["regex_hard"]
-        elif s[2] == "ORG":
+        elif s[2] == "ORG" or (
+            s[2] == "LOCATION" and _TRUSTED_REGEX_LOCATION_RE.fullmatch(s[3])
+        ):
             priority = _PRIORITY["regex_org"]
         else:
             priority = _PRIORITY["regex"]
