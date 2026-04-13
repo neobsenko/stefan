@@ -69,6 +69,20 @@ def test_spacy_reference_code_org_false_positive_is_dropped(monkeypatch):
     assert "BL-2026-9999" not in mapping.values()
 
 
+def test_spacy_single_token_person_common_word_is_dropped(monkeypatch):
+    text = "Projektet pausades tills fakturan är kontrollerad."
+
+    def fake_detect_spacy(_: str):
+        return [(0, 9, "PERSON", "Projektet")]
+
+    monkeypatch.setattr("stefan.redactor.detect_spacy", fake_detect_spacy)
+
+    redacted, mapping = redact(text, use_spacy=True)
+
+    assert redacted == text
+    assert "Projektet" not in mapping.values()
+
+
 def test_dictionary_org_survives_spacy_split_for_raddningstjansten():
     text = "Räddningstjänsten Storstockholm kontaktades."
     merged = merge_spans(

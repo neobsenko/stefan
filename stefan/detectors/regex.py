@@ -436,6 +436,10 @@ _LOCATION_LEADING_TRASH = frozenset(
     }
 )
 
+_ORG_PERSON_TO_LAW_FIRM_BRIDGE_RE = re.compile(
+    r"\s+på\s+(?=Advokatfirman|Advokatbyrån)", re.IGNORECASE
+)
+
 
 def _trim_location_leading_prose(text: str, start: int, end: int) -> Tuple[int, int]:
     """Drop leading capitalized sentence words before multi-word street matches."""
@@ -458,6 +462,22 @@ def _trim_location_leading_prose(text: str, start: int, end: int) -> Tuple[int, 
     if len(rest.split()) < 2 or not any(c.isdigit() for c in rest):
         return start, end
     return new_start, end
+
+
+def _split_org_person_to_law_firm_bridge(
+    text: str,
+    start: int,
+    end: int,
+) -> List[Tuple[int, int]]:
+    """Split over-broad ORGs like ``Person på Advokatfirman X AB``."""
+    chunk = text[start:end]
+    m = _ORG_PERSON_TO_LAW_FIRM_BRIDGE_RE.search(chunk)
+    if not m:
+        return [(start, end)]
+    right_start = start + m.end()
+    if right_start >= end:
+        return [(start, end)]
+    return [(right_start, end)]
 
 
 def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
@@ -486,6 +506,10 @@ def detect_regex(text: str) -> List[Tuple[int, int, str, str]]:
 
     adjusted: List[Tuple[int, int, str, str]] = []
     for start, end, entity_type, matched in spans:
+        if entity_type == "ORG":
+            for ns, ne in _split_org_person_to_law_firm_bridge(text, start, end):
+                adjusted.append((ns, ne, entity_type, text[ns:ne]))
+            continue
         if entity_type != "LOCATION":
             adjusted.append((start, end, entity_type, matched))
             continue

@@ -93,6 +93,7 @@ _SPACY_ORG_ROLE_WORDS = frozenset(
         "Protokollförare",
     }
 )
+_SPACY_SINGLE_TOKEN_PERSON_RE = re.compile(r"^[^\W\d_]+$", re.UNICODE)
 
 
 @lru_cache(maxsize=1)
@@ -134,12 +135,57 @@ def _filter_spacy_false_positive_spans(
         if priority != _PRIORITY["spacy"]:
             out.append(span)
             continue
+        if (
+            entity_type == "PERSON"
+            and _SPACY_SINGLE_TOKEN_PERSON_RE.fullmatch(value)
+        ):
+            continue
         if entity_type == "ORG" and (
             value in _SPACY_ORG_ROLE_WORDS or _SPACY_REFERENCE_CODE_RE.fullmatch(value)
         ):
             continue
         if entity_type == "LOCATION" and "-" in value and not any(
             ch.isdigit() for ch in value
+        ):
+            continue
+        out.append(span)
+    return out
+
+
+def _hyphen_neighbor_segment(text: str, start: int, direction: int) -> str:
+    if direction > 0:
+        i = start
+        while i < len(text) and (text[i].isalnum() or text[i] in "_'’‘"):
+            i += 1
+        return text[start:i]
+
+    i = start - 1
+    while i >= 0 and (text[i].isalnum() or text[i] in "_'’‘"):
+        i -= 1
+    return text[i + 1 : start]
+
+
+def _is_part_of_lowercase_hyphen_compound(start: int, end: int, text: str) -> bool:
+    if end + 1 < len(text) and text[end] == "-":
+        right = _hyphen_neighbor_segment(text, end + 1, 1)
+        if right and right[0].islower():
+            return True
+    if start >= 2 and text[start - 1] == "-":
+        left = _hyphen_neighbor_segment(text, start - 1, -1)
+        if left and left[0].islower():
+            return True
+    return False
+
+
+def _drop_persons_in_lowercase_hyphen_compounds(
+    spans: List[Tuple[int, int, str, str]],
+    text: str,
+) -> List[Tuple[int, int, str, str]]:
+    """Drop PERSON fragments embedded in compounds like ``Pierre-Lars-projektet``."""
+    out: List[Tuple[int, int, str, str]] = []
+    for span in spans:
+        if span[2] == "PERSON" and _is_part_of_lowercase_hyphen_compound(
+            span[0], span[1], text
         ):
             continue
         out.append(span)
@@ -705,6 +751,7 @@ def merge_spans(
     if text is not None:
         result = _merge_adjacent_persons(result, text)
         result = _extend_hyphenated_person_surnames(result, text)
+        result = _drop_persons_in_lowercase_hyphen_compounds(result, text)
         result = _merge_adjacent_orgs(result, text)
         result = _extend_org_polish_zoo(result, text)
         result = _coreference_person_first_names(result, text)

@@ -41,6 +41,16 @@ def test_advokatbyran_org_beats_overlapping_person():
     assert "Nordquist" in org_hit[0][3]
 
 
+def test_advokatfirman_context_keeps_person_and_org_separate():
+    text = "Henrik Berglund-Wikström på Advokatfirman Lindahl & Partners AB"
+    redacted, mapping = redact(text, use_spacy=False)
+    assert mapping == {
+        "PERSON_1": "Henrik Berglund-Wikström",
+        "ORG_1": "Advokatfirman Lindahl & Partners AB",
+    }
+    assert redacted == "PERSON_1 på ORG_1"
+
+
 def test_regex_beats_dictionary_on_overlap():
     # Imagine "Johan" overlaps with "johan@x.se" — regex should win.
     regex = [(0, 11, "EMAIL", "johan@x.se")]
@@ -387,6 +397,23 @@ def test_person_lookahead_extends_after_hyphenated_first_name():
     _, mapping = redact(text, use_spacy=False)
     assert "Hans-Jürgen Müller" in mapping.values()
     assert "Hans-Jürgen" not in mapping.values()
+
+
+def test_hyphenated_lowercase_compound_does_not_emit_short_person_fragments():
+    text = "Pierre-Lars-projektet och Lindberg-Berg-montage pausades."
+    redacted, mapping = redact(text, use_spacy=False)
+    assert redacted == text
+    assert not any(k.startswith("PERSON_") for k in mapping)
+
+
+def test_curly_apostrophe_particle_name_stays_whole():
+    text = "Charlotte d’Aubigné-Lindberg och O’Sullivan-Berg deltog."
+    _, mapping = redact(text, use_spacy=False)
+    people = [v for k, v in mapping.items() if k.startswith("PERSON_")]
+    assert "Charlotte d’Aubigné-Lindberg" in people
+    assert "O’Sullivan-Berg" in people
+    assert "Charlotte" not in people
+    assert "Aubigné-Lindberg" not in people
 
 
 def test_sophiahemmet_redacts_as_org():

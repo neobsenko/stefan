@@ -16,6 +16,7 @@ _LC = (
     r"a-zäöåæøąćęłńóśźżçğıişüčďěňřšťůžáéíóúýàèìòùâêîôûëïÿ"
     r"āēīōūķļņșțőű"
 )
+_APOS = r"['\u2019\u2018]"
 _CAP_TOKEN = rf"[{_UC}][{_LC}]+"
 _CAP_TOKEN_APOS = rf"[{_UC}][{_LC}''\-]*"
 
@@ -81,7 +82,7 @@ _ARABIC_ABU_IBN = re.compile(
 # Romance apostrophe/particle names, e.g. Charlotte d'Aubigné-Lindberg, François de la Tour.
 _ROMANCE_PARTICLE = re.compile(
     rf"\b[{_UC}][\w''\-]+\s+"
-    rf"(?:d'|D'|l'|L'|de\s+la|de|du|des)\s*"
+    rf"(?:[dDlL]{_APOS}|de\s+la|de|du|des)\s*"
     rf"[{_UC}][\w''\-]+"
     rf"(?:-[{_UC}][\w''\-]+)?\b",
     re.UNICODE,
